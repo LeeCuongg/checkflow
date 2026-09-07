@@ -76,15 +76,16 @@ export default function NeedRepairPage() {
   const [designerSearch, setDesignerSearch] = useState("")
   type SortKey =
     | "designer"
-    | "orders"
-    | "total_orders_processed"
-    | "repair_rate_design_error"
-    | "repair_rate_customer_change"
-    | "times"
-    | "avg_times_per_order"
+    | "total_rounds"
+    | "distinct_orders"
+    | "nr_times"
+    | "rate_design_error"
+    | "rate_customer_change"
     | "design_error"
     | "customer_change"
-  const [sortKey, setSortKey] = useState<SortKey>("orders")
+    | "confirmed_after_repair"
+    | "repaired_for_others"
+  const [sortKey, setSortKey] = useState<SortKey>("total_rounds")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -280,7 +281,8 @@ export default function NeedRepairPage() {
         <CardHeader>
           <CardTitle className="text-lg">Filters</CardTitle>
           <CardDescription>
-            Time range áp dụng cho thời điểm reviewer mark NEED REPAIR (order_history.created_at)
+            Time range áp dụng cho thời điểm reviewer chấm bài — CONFIRMED hoặc NEED REPAIR
+            (order_history.created_at). Lỗi tính cho designer đang giữ đơn lúc bị trả, không phải designer đầu tiên.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -398,59 +400,70 @@ export default function NeedRepairPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card className="shadow-md border-0 bg-gradient-to-br from-red-50 to-red-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Total Repair Orders</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-700">Đơn cần sửa</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">{summary.totalOrders ?? summary.totalRepairs ?? 0}</div>
-            <p className="text-xs text-gray-600 mt-1">Distinct items needing repair</p>
+            <p className="text-xs text-gray-600 mt-1">Đơn distinct bị trả về trong kỳ</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-md border-0 bg-gradient-to-br from-purple-50 to-purple-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Repair Times</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-700">Lượt bị trả</CardTitle>
             <Repeat className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">{summary.totalTimes ?? summary.totalRepairs ?? 0}</div>
-            <p className="text-xs text-gray-600 mt-1">Total NEED REPAIR marks</p>
+            <p className="text-xs text-gray-600 mt-1">Tổng số lần mark NEED REPAIR</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-md border-0 bg-gradient-to-br from-orange-50 to-orange-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Design Errors</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-700">Đơn lỗi design</CardTitle>
             <Package className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{summary.designErrors || 0}</div>
-            <p className="text-xs text-gray-600 mt-1">Designer mistakes</p>
+            <div className="text-2xl font-bold text-gray-900">{summary.designErrorOrders || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">{summary.designErrors || 0} lượt · đơn distinct</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-md border-0 bg-gradient-to-br from-blue-50 to-blue-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Customer Changes</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-700">Đơn customer change</CardTitle>
             <User className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{summary.customerChanges || 0}</div>
-            <p className="text-xs text-gray-600 mt-1">Customer requests</p>
+            <div className="text-2xl font-bold text-gray-900">{summary.customerChangeOrders || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">{summary.customerChanges || 0} lượt · đơn distinct</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md border-0 bg-gradient-to-br from-teal-50 to-teal-100">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Chốt sau sửa</CardTitle>
+            <Repeat className="h-4 w-4 text-teal-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{summary.confirmedAfterRepair || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">Đơn từng bị trả, được CONFIRMED trong kỳ</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-md border-0 bg-gradient-to-br from-green-50 to-green-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Active Designers</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-700">Designer bị trả</CardTitle>
             <Users className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">{summary.uniqueDesigners || 0}</div>
-            <p className="text-xs text-gray-600 mt-1">Designers involved</p>
+            <p className="text-xs text-gray-600 mt-1">{summary.gradedDesigners || 0} designer có lượt chấm</p>
           </CardContent>
         </Card>
       </div>
@@ -468,7 +481,10 @@ export default function NeedRepairPage() {
                 <Users className="h-5 w-5 text-pink-600 mr-2" />
                 Repair Statistics by Designer
               </CardTitle>
-              <CardDescription>Breakdown of repair requests by designer and issue type</CardDescription>
+              <CardDescription>
+                Đơn vị đo là lượt chấm: mỗi lần reviewer đánh giá bài của designer đang giữ đơn. Đơn chuyển tay thì
+                lỗi thuộc người gây ra, lượt đạt và cột &quot;Sửa hộ&quot; thuộc người sửa.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative max-w-sm">
@@ -487,64 +503,81 @@ export default function NeedRepairPage() {
                       <TableHead onClick={() => toggleSort("designer")} className="cursor-pointer select-none">
                         Designer <SortIcon k="designer" />
                       </TableHead>
-                      <TableHead onClick={() => toggleSort("orders")} className="text-center cursor-pointer select-none">
-                        Design Error <SortIcon k="orders" />
+                      <TableHead
+                        onClick={() => toggleSort("total_rounds")}
+                        className="text-center cursor-pointer select-none"
+                        title="Số lần reviewer chấm bài của designer (CONFIRMED + NEED REPAIR) — mẫu số của các tỉ lệ"
+                      >
+                        Lượt chấm <SortIcon k="total_rounds" />
                       </TableHead>
                       <TableHead
-                        onClick={() => toggleSort("total_orders_processed")}
+                        onClick={() => toggleSort("distinct_orders")}
                         className="text-center cursor-pointer select-none"
+                        title="Số đơn distinct designer có mặt trong kỳ"
                       >
-                        Tổng đơn <SortIcon k="total_orders_processed" />
+                        Đơn <SortIcon k="distinct_orders" />
                       </TableHead>
                       <TableHead
-                        onClick={() => toggleSort("repair_rate_design_error")}
+                        onClick={() => toggleSort("rate_design_error")}
                         className="text-center cursor-pointer select-none"
+                        title="Lượt bị trả do lỗi design / tổng lượt chấm"
                       >
-                        Tỉ lệ Design Error <SortIcon k="repair_rate_design_error" />
+                        Tỉ lệ lỗi design <SortIcon k="rate_design_error" />
                       </TableHead>
                       <TableHead
-                        onClick={() => toggleSort("repair_rate_customer_change")}
+                        onClick={() => toggleSort("rate_customer_change")}
                         className="text-center cursor-pointer select-none"
+                        title="Lượt bị trả do khách đổi ý / tổng lượt chấm"
                       >
-                        Tỉ lệ Customer Change <SortIcon k="repair_rate_customer_change" />
-                      </TableHead>
-                      <TableHead onClick={() => toggleSort("times")} className="text-center cursor-pointer select-none">
-                        Lần sửa <SortIcon k="times" />
-                      </TableHead>
-                      <TableHead
-                        onClick={() => toggleSort("avg_times_per_order")}
-                        className="text-center cursor-pointer select-none"
-                      >
-                        TB lần/đơn <SortIcon k="avg_times_per_order" />
+                        Tỉ lệ customer change <SortIcon k="rate_customer_change" />
                       </TableHead>
                       <TableHead
                         onClick={() => toggleSort("design_error")}
                         className="text-center cursor-pointer select-none"
+                        title="Số lượt bị trả do lỗi design"
                       >
-                        Total Design Error <SortIcon k="design_error" />
+                        Lỗi design <SortIcon k="design_error" />
                       </TableHead>
                       <TableHead
                         onClick={() => toggleSort("customer_change")}
                         className="text-center cursor-pointer select-none"
+                        title="Số lượt bị trả do khách đổi ý"
                       >
-                        Customer Changes <SortIcon k="customer_change" />
+                        Customer change <SortIcon k="customer_change" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("nr_times")}
+                        className="text-center cursor-pointer select-none"
+                        title="Tổng số lượt bị trả về (cả 2 loại). Trong ngoặc là số đơn distinct."
+                      >
+                        Lượt bị trả <SortIcon k="nr_times" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("confirmed_after_repair")}
+                        className="text-center cursor-pointer select-none"
+                        title="Đơn từng bị trả về và được designer này chốt trong kỳ"
+                      >
+                        Chốt sau sửa <SortIcon k="confirmed_after_repair" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("repaired_for_others")}
+                        className="text-center cursor-pointer select-none"
+                        title="Số lần đứng ra sửa đơn do designer KHÁC gây lỗi"
+                      >
+                        Sửa hộ <SortIcon k="repaired_for_others" />
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredDesignerStats.map((designer: any, index: number) => {
-                      const orders = designer.orders ?? designer.total ?? 0
-                      const times = designer.times ?? designer.total ?? 0
-                      const avgPerOrder = orders > 0 ? (times / orders).toFixed(2) : "0.00"
-                      const totalProcessed = designer.total_orders_processed ?? 0
+                      const rounds = designer.total_rounds ?? 0
+                      const distinctOrders = designer.distinct_orders ?? 0
+                      const nrTimes = designer.nr_times ?? 0
+                      const ordersNr = designer.orders_need_repair ?? 0
                       const rateDE: number | null =
-                        typeof designer.repair_rate_design_error === "number"
-                          ? designer.repair_rate_design_error
-                          : null
+                        typeof designer.rate_design_error === "number" ? designer.rate_design_error : null
                       const rateCC: number | null =
-                        typeof designer.repair_rate_customer_change === "number"
-                          ? designer.repair_rate_customer_change
-                          : null
+                        typeof designer.rate_customer_change === "number" ? designer.rate_customer_change : null
                       const fmtRate = (r: number | null) => (r === null ? "N/A" : r.toFixed(1) + "%")
                       const colorRate = (r: number | null, hi: number, mid: number) =>
                         r === null
@@ -568,13 +601,13 @@ export default function NeedRepairPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="outline" className="bg-gray-50">
-                              {orders}
+                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+                              {rounds}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
-                              {totalProcessed}
+                            <Badge variant="outline" className="bg-gray-50">
+                              {distinctOrders}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
@@ -584,14 +617,6 @@ export default function NeedRepairPage() {
                             <span className={`font-medium ${colorRate(rateCC, 25, 10)}`}>{fmtRate(rateCC)}</span>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                              {times}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="font-medium text-gray-900">{avgPerOrder}</span>
-                          </TableCell>
-                          <TableCell className="text-center">
                             <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                               {designer.design_error}
                             </Badge>
@@ -599,6 +624,22 @@ export default function NeedRepairPage() {
                           <TableCell className="text-center">
                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                               {designer.customer_change}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                              {nrTimes}
+                            </Badge>
+                            <span className="text-xs text-gray-500 ml-1">({ordersNr} đơn)</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              {designer.confirmed_after_repair ?? 0}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                              {designer.repaired_for_others ?? 0}
                             </Badge>
                           </TableCell>
                         </TableRow>

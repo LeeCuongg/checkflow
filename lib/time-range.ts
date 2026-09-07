@@ -18,6 +18,21 @@ function addDays(d: Date, n: number): Date {
   return new Date(d.getTime() + n * DAY_MS)
 }
 
+// Số ngày đã trôi qua kể từ Thứ Hai của tuần chứa `today` (0 = T2 … 6 = CN).
+// getUTCDay() trên mốc đã shift sang VN cho ra thứ theo lịch VN (0 = CN).
+function vnDaysSinceMonday(today: Date): number {
+  const dow = new Date(today.getTime() + VN_OFFSET_MS).getUTCDay()
+  return (dow + 6) % 7
+}
+
+// Trả về key ngày 'YYYY-MM-DD' theo lịch VN. Dùng để gom nhóm theo ngày —
+// KHÔNG dùng toDateString() vì nó theo timezone của process (UTC trên Vercel),
+// làm các mark trước 07:00 VN rơi nhầm sang ngày hôm trước.
+export function vnDateKey(value: string | Date): string {
+  const d = typeof value === "string" ? new Date(value) : value
+  return new Date(d.getTime() + VN_OFFSET_MS).toISOString().slice(0, 10)
+}
+
 // VN không có DST → tính tháng bằng cách shift sang VN rồi clamp.
 function vnStartOfMonth(now: Date, monthOffset: number): Date {
   const shifted = new Date(now.getTime() + VN_OFFSET_MS)
@@ -42,15 +57,11 @@ export function getDateRange(
     case "yesterday":
       return { start: addDays(today, -1), end: today }
     case "this_week": {
-      // Tuần bắt đầu Chủ Nhật, theo lịch VN.
-      const shifted = new Date(today.getTime() + VN_OFFSET_MS)
-      const dow = shifted.getUTCDay() // 0 = CN
-      return { start: addDays(today, -dow), end: new Date() }
+      // Tuần bắt đầu THỨ HAI, theo lịch VN.
+      return { start: addDays(today, -vnDaysSinceMonday(today)), end: new Date() }
     }
     case "last_week": {
-      const shifted = new Date(today.getTime() + VN_OFFSET_MS)
-      const dow = shifted.getUTCDay()
-      const start = addDays(today, -dow - 7)
+      const start = addDays(today, -vnDaysSinceMonday(today) - 7)
       return { start, end: addDays(start, 7) }
     }
     case "this_month":

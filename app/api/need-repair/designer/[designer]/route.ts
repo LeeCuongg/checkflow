@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { getDateRange } from "@/lib/time-range"
 
 export async function GET(request: NextRequest, { params }: { params: { designer: string } }) {
   try {
@@ -43,50 +44,20 @@ export async function GET(request: NextRequest, { params }: { params: { designer
         users!created_by(email)
       `)
       .eq("status", "NEED REPAIR")
-      .eq("designer", designer)
+      // ilike (không wildcard) = so khớp không phân biệt hoa thường, cho khớp với
+      // cách RPC v2 normalize bằng LOWER(BTRIM()). Escape ký tự wildcard của LIKE
+      // để tên có '%' hoặc '_' không biến thành pattern.
+      .ilike("designer", designer.replace(/([%_\\])/g, "\\$1"))
 
-    // Apply time filtering
-    const now = new Date()
-    switch (timeRange) {
-      case "today":
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        query = query.gte("created_at", today.toISOString())
-        break
-      case "yesterday":
-        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-        const yesterdayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        query = query.gte("created_at", yesterday.toISOString()).lt("created_at", yesterdayEnd.toISOString())
-        break
-      case "this_week":
-        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()))
-        startOfWeek.setHours(0, 0, 0, 0)
-        query = query.gte("created_at", startOfWeek.toISOString())
-        break
-      case "last_week":
-        const lastWeekStart = new Date(now.setDate(now.getDate() - now.getDay() - 7))
-        lastWeekStart.setHours(0, 0, 0, 0)
-        const lastWeekEnd = new Date(now.setDate(now.getDate() - now.getDay()))
-        lastWeekEnd.setHours(0, 0, 0, 0)
-        query = query.gte("created_at", lastWeekStart.toISOString()).lt("created_at", lastWeekEnd.toISOString())
-        break
-      case "this_month":
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        query = query.gte("created_at", startOfMonth.toISOString())
-        break
-      case "last_month":
-        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1)
-        query = query.gte("created_at", lastMonthStart.toISOString()).lt("created_at", lastMonthEnd.toISOString())
-        break
-      case "custom":
-        if (startDate && endDate) {
-          query = query.gte("created_at", startDate).lte("created_at", endDate)
-        }
-        break
-      case "all_time":
-      default:
-        // No additional filter
-        break
+    // Apply time filtering — dùng chung getDateRange với /api/need-repair/stats để hai
+    // trang ra cùng một khoảng thời gian (giờ VN, tuần bắt đầu Thứ Hai, biên nửa mở).
+    // Khối switch tự tính trước đây chạy theo giờ local của process (UTC trên Vercel)
+    // nên lệch 7h, và case last_week bị sai do now.setDate() mutate chính `now`.
+    const dateRange = getDateRange(timeRange, startDate, endDate)
+    if (dateRange) {
+      query = query
+        .gte("created_at", dateRange.start.toISOString())
+        .lt("created_at", dateRange.end.toISOString())
     }
 
     const { data: repairDetails, error: detailsError } = await query.order("created_at", { ascending: false })

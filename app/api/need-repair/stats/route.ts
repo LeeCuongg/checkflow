@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase"
 import { logServerError, logServerInfo } from "@/lib/server-sentry"
 import { meraClient } from "@/lib/mera-client"
 import type { MeraOrder } from "@/types/mera-order"
-import { getDateRange } from "@/lib/time-range"
+import { getDateRange, vnDateKey } from "@/lib/time-range"
 
 const MERA_SHEET_ID = "__mera__"
 const MERA_PAGE_SIZE = 500
@@ -185,12 +185,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // === Designer stats từ RPC ===
-    // Đơn vị: đơn ĐÃ CONFIRMED (đơn chốt) trong dateRange.
-    // Designer = designer ĐẦU TIÊN trong order_history (snapshot sớm nhất).
-    // Tỉ lệ = (đơn có ≥1 NEED REPAIR | design_error | customer_change) / (đơn CONFIRMED).
+    // === Designer stats từ RPC v2 ===
+    // Đơn vị: LƯỢT CHẤM — mỗi row order_history có status CONFIRMED hoặc NEED REPAIR
+    // là một lần reviewer chấm bài của designer ĐANG GIỮ ĐƠN lúc đó.
+    // Designer = snapshot order_history.designer trên chính row đó (KHÔNG phải designer
+    // đầu tiên của đơn như v1) → đơn bị chuyển tay thì lỗi thuộc người gây ra, công
+    // thuộc người sửa. Xem scripts/create-designer-repair-stats-rpc-v2.sql.
+    // Tỉ lệ = (lượt NR do design_error | customer_change) / (tổng lượt chấm).
     const { data: designerRpcData, error: designerRpcError } = await supabase.rpc(
-      "get_designer_repair_stats",
+      "get_designer_repair_stats_v2",
       {
         p_time_from: dateRange?.start.toISOString() ?? null,
         p_time_to: dateRange?.end.toISOString() ?? null,
@@ -201,7 +204,7 @@ export async function GET(request: NextRequest) {
     )
     if (designerRpcError) {
       logServerError(designerRpcError, {
-        context: "GET /api/need-repair/stats - RPC get_designer_repair_stats",
+        context: "GET /api/need-repair/stats - RPC get_designer_repair_stats_v2",
         userId: appUser.sub,
         timeRange,
       })
@@ -231,24 +234,34 @@ export async function GET(request: NextRequest) {
 
     // === Process NEED REPAIR EVENTS (cho detailedRecords, productTypeStats, dailyStats, summary) ===
     // Đây là sự kiện NEED REPAIR trong khoảng dateRange (theo lúc bị mark).
-    // Khác với designerStats — đo theo ĐƠN CONFIRMED.
+    // Cùng hệ thời gian với designerStats v2 (đều lọc theo created_at của row).
     const changeTypeStats = { design_error: 0, customer_change: 0 }
     const productTypeStats = new Map<string, { times: number; orderIds: Set<string> }>()
     const dailyStats = new Map<string, number>()
     const allOrderIds = new Set<string>()
+    // Đơn distinct tách theo loại lỗi — khác allOrderIds ở chỗ không gộp 2 loại.
+    // Một đơn bị mark cả 2 loại sẽ nằm trong cả 2 set.
+    const designErrorOrderIds = new Set<string>()
+    const customerChangeOrderIds = new Set<string>()
+    const activeDesigners = new Set<string>()
 
     repairData?.forEach((record) => {
       const changeType = record.change_type
       const productType = record.product_type || "Unknown"
-      const date = new Date(record.created_at).toDateString()
+      const date = vnDateKey(record.created_at)
       const orderKey = record.item_id
         ? `${record.item_id}::${record.google_sheet_id}`
         : `__row_${record.id}`
 
       allOrderIds.add(orderKey)
 
+      const designerName = String(record.designer ?? "").trim()
+      if (designerName) activeDesigners.add(designerName.toLowerCase())
+
       if (changeType && changeTypeStats.hasOwnProperty(changeType)) {
         changeTypeStats[changeType as keyof typeof changeTypeStats]++
+        if (changeType === "design_error") designErrorOrderIds.add(orderKey)
+        else customerChangeOrderIds.add(orderKey)
       }
 
       const product = productTypeStats.get(productType) ?? { times: 0, orderIds: new Set<string>() }
@@ -259,31 +272,35 @@ export async function GET(request: NextRequest) {
       dailyStats.set(date, (dailyStats.get(date) || 0) + 1)
     })
 
-    // === Build designer stats array từ RPC output ===
-    // RPC trả về (per designer): confirmed_orders, orders_need_repair, orders_design_error,
-    // orders_customer_change, need_repair_times, design_error_times, customer_change_times.
+    // === Build designer stats array từ RPC v2 output ===
+    // RPC trả về (per designer): total_rounds, distinct_orders, nr_times, de_times, cc_times,
+    // orders_nr, orders_de, orders_cc, confirmed_after_repair, repaired_for_others.
     const designerStatsArray = (designerRpcData ?? []).map((row: any) => {
-      const confirmed = Number(row.confirmed_orders) || 0
-      const orders = Number(row.orders_need_repair) || 0
-      const ordersDe = Number(row.orders_design_error) || 0
-      const ordersCc = Number(row.orders_customer_change) || 0
-      const times = Number(row.need_repair_times) || 0
-      const deTimes = Number(row.design_error_times) || 0
-      const ccTimes = Number(row.customer_change_times) || 0
+      const rounds = Number(row.total_rounds) || 0
+      const distinctOrders = Number(row.distinct_orders) || 0
+      const nrTimes = Number(row.nr_times) || 0
+      const deTimes = Number(row.de_times) || 0
+      const ccTimes = Number(row.cc_times) || 0
+      const ordersNr = Number(row.orders_nr) || 0
+      const ordersDe = Number(row.orders_de) || 0
+      const ordersCc = Number(row.orders_cc) || 0
       return {
         designer: row.designer_display || row.designer || "Unassigned",
-        orders, // "Đơn cần sửa" = đơn CONFIRMED có ≥1 NEED REPAIR
-        times, // "Lần sửa" = tổng số lần mark NEED REPAIR trên đơn của designer
-        avg_times_per_order: orders > 0 ? times / orders : 0,
-        design_error: deTimes, // "Design Errors" theo LẦN
-        customer_change: ccTimes,
-        design_error_orders: ordersDe, // số đơn distinct có ≥1 design_error
-        error_rate: orders > 0 ? (ordersDe / orders) * 100 : 0,
-        total_orders_processed: confirmed, // "Tổng đơn" = đơn CONFIRMED của designer
-        repair_rate: confirmed > 0 ? (orders / confirmed) * 100 : null,
-        repair_rate_design_error: confirmed > 0 ? (ordersDe / confirmed) * 100 : null,
-        repair_rate_customer_change: confirmed > 0 ? (ordersCc / confirmed) * 100 : null,
-        total: times, // legacy
+        total_rounds: rounds, // "Lượt chấm" = MẪU SỐ
+        distinct_orders: distinctOrders, // "Đơn" = số đơn distinct designer có mặt trong kỳ
+        nr_times: nrTimes, // "Lượt bị trả" = số lần bị mark NEED REPAIR
+        design_error: deTimes, // "Lỗi design" theo LƯỢT
+        customer_change: ccTimes, // "Customer change" theo LƯỢT
+        orders_need_repair: ordersNr, // số ĐƠN distinct bị trả
+        orders_design_error: ordersDe,
+        orders_customer_change: ordersCc,
+        confirmed_after_repair: Number(row.confirmed_after_repair) || 0, // đơn chốt sau sửa
+        repaired_for_others: Number(row.repaired_for_others) || 0, // số lần sửa hộ designer khác
+        // Tỉ lệ theo LƯỢT: tử số và mẫu số cùng một quy gán designer nên không bao giờ > 100%.
+        rate_design_error: rounds > 0 ? (deTimes / rounds) * 100 : null,
+        rate_customer_change: rounds > 0 ? (ccTimes / rounds) * 100 : null,
+        rate_need_repair: rounds > 0 ? (nrTimes / rounds) * 100 : null,
+        avg_times_per_order: ordersNr > 0 ? nrTimes / ordersNr : 0,
         products: [] as Array<{ product: string; count: number }>,
       }
     })
@@ -313,6 +330,7 @@ export async function GET(request: NextRequest) {
         designer: record.designer || "Unassigned",
         product_type: record.product_type || "Unknown",
         order_note: record.order_note,
+        change_type: record.change_type,
         created_at: record.created_at,
         users: record.users,
         source: record.google_sheet_id === MERA_SHEET_ID ? "mera" : "sheet",
@@ -339,9 +357,20 @@ export async function GET(request: NextRequest) {
         summary: {
           totalOrders, // số ĐƠN distinct cần sửa
           totalTimes, // tổng số LẦN mark NEED REPAIR
-          designErrors: changeTypeStats.design_error, // số lần có change_type=design_error
+          designErrors: changeTypeStats.design_error, // số LẦN có change_type=design_error
           customerChanges: changeTypeStats.customer_change,
-          uniqueDesigners: designerStatsArray.length,
+          // Số ĐƠN distinct tách theo loại lỗi (khác designErrors/customerChanges vốn đếm theo lần)
+          designErrorOrders: designErrorOrderIds.size,
+          customerChangeOrders: customerChangeOrderIds.size,
+          // Đơn từng bị NR và được CONFIRMED trong kỳ — cộng từ RPC v2.
+          confirmedAfterRepair: designerStatsArray.reduce(
+            (sum: number, d: any) => sum + (d.confirmed_after_repair || 0),
+            0,
+          ),
+          // Designer bị mark NEED REPAIR trong kỳ (theo sự kiện, cùng hệ với các số trên).
+          uniqueDesigners: activeDesigners.size,
+          // Số designer có lượt chấm trong kỳ (theo RPC v2) — mẫu số của bảng bên dưới.
+          gradedDesigners: designerStatsArray.length,
           // Trường legacy — bằng totalTimes, giữ để không vỡ phần khác nếu còn dùng
           totalRepairs: totalTimes,
         },
