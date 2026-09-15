@@ -86,6 +86,7 @@ export interface MeraOrderItem {
   design_link: string
   customer_image: string
   mockup_link: string
+  source_link?: string
   tracking: MeraTracking
   designer?: MeraDesigner
   version: number

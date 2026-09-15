@@ -17,6 +17,7 @@ import type {
 import { formatDate } from "@/utils/format-utils"
 import { extractImageUrls } from "@/utils/image-utils"
 import { OrderComments } from "@/components/review/order-comments"
+import { listingUrl, listingUrlTitle } from "@/lib/listing-url"
 
 interface OrderDetailsPanelProps {
   order: Order
@@ -263,6 +264,8 @@ export function OrderDetailsPanel({
     }
   }
 
+  const storeListingUrl = listingUrl(order)
+
   const handleCancelEditLinks = () => {
     setMockupLink(order.mockup || "")
     setDesignLink(order.designLink || "")
@@ -295,16 +298,19 @@ export function OrderDetailsPanel({
             </div>
             <div>
               <span className="text-gray-600">{order.store ? "Store" : "Product"}:</span>{" "}
-              {order.store ? (
+              {order.store && storeListingUrl ? (
                 <a
-                  href={`https://www.etsy.com/shop/${order.store}?search_query=${encodeURIComponent(order.productName || "")}`}
+                  href={storeListingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  title={listingUrlTitle(order.channel)}
                   className="font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
                 >
                   {order.store}
                   <ExternalLink className="h-3 w-3" />
                 </a>
+              ) : order.store ? (
+                <span className="font-medium">{order.store}</span>
               ) : (
                 <span className="font-medium">{order.productName || "N/A"}</span>
               )}

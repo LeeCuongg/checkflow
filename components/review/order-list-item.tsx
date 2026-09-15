@@ -10,6 +10,7 @@ import { LazyImage } from "@/components/ui/lazy-image"
 import { ExternalLink, User, Calendar, Store, Package, Copy, CheckCheck } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import type { Order } from "@/types/order"
+import { listingUrl, listingUrlTitle } from "@/lib/listing-url"
 
 interface OrderListItemProps {
   order: Order
@@ -93,12 +94,18 @@ export function OrderListItem({ order }: OrderListItemProps) {
     }
   }
 
+  const productListingUrl = listingUrl({
+    ...order,
+    productName: order.productName?.replace(/\s+/g, " "),
+  })
+  const isEtsyChannel = !["amazon", "shopify"].includes((order.channel ?? "").toLowerCase())
+
   const handleStoreClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
 
-    if (order.store) {
-      const storeUrl = `https://etsy.com/shop/${order.store}`
+    const storeUrl = isEtsyChannel && order.store ? `https://etsy.com/shop/${order.store}` : productListingUrl
+    if (storeUrl) {
       window.open(storeUrl, "_blank", "noopener,noreferrer")
     }
   }
@@ -107,10 +114,8 @@ export function OrderListItem({ order }: OrderListItemProps) {
     e.preventDefault()
     e.stopPropagation()
 
-    if (order.store && order.productName) {
-      const searchQuery = encodeURIComponent(order.productName.replace(/\s+/g, " "))
-      const productUrl = `https://www.etsy.com/shop/${order.store}?search_query=${searchQuery}`
-      window.open(productUrl, "_blank", "noopener,noreferrer")
+    if (productListingUrl) {
+      window.open(productListingUrl, "_blank", "noopener,noreferrer")
     }
   }
 
@@ -207,7 +212,7 @@ export function OrderListItem({ order }: OrderListItemProps) {
                     <p
                       className="text-gray-600 mt-1 cursor-pointer hover:text-blue-600 hover:underline transition-colors"
                       onClick={handleProductClick}
-                      title="Click to search product on Etsy"
+                      title={listingUrlTitle(order.channel)}
                     >
                       {truncateText(order.productName, 60)}
                       <ExternalLink className="w-3 h-3 inline ml-1" />
@@ -223,7 +228,7 @@ export function OrderListItem({ order }: OrderListItemProps) {
                   <span
                     className="text-gray-600 cursor-pointer hover:text-blue-600 hover:underline transition-colors flex items-center gap-1"
                     onClick={handleStoreClick}
-                    title="Click to open store on Etsy"
+                    title={isEtsyChannel ? "Click to open store on Etsy" : listingUrlTitle(order.channel)}
                   >
                     {order.store}
                     <ExternalLink className="w-3 h-3" />

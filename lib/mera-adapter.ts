@@ -33,6 +33,9 @@ function adaptMeraOrderWithItem(order: MeraOrder, item: MeraOrderItem): Order & 
     productType: item.product_type || undefined,
     productName: item.product_name || undefined,
     country: order.shipping?.country || undefined,
+    channel: order.channel || undefined,
+    shopId: order.shop_id || undefined,
+    sourceLink: item.source_link || order.source_link || undefined,
     rowPosition: undefined,
     _mera: order,
   }
@@ -60,6 +63,9 @@ export function adaptMeraOrder(order: MeraOrder): Order & { _mera: MeraOrder } {
     productType: undefined,
     productName: undefined,
     country: order.shipping?.country || undefined,
+    channel: order.channel || undefined,
+    shopId: order.shop_id || undefined,
+    sourceLink: order.source_link || undefined,
     rowPosition: undefined,
     _mera: order,
   }
