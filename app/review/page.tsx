@@ -7,6 +7,7 @@ import { useMeraOrders } from "@/hooks/use-mera-orders"
 import { useMeraMutations } from "@/hooks/use-mera-mutations"
 import { adaptMeraOrders } from "@/lib/mera-adapter"
 import { SheetSelector } from "@/components/review/sheet-selector"
+import { MeraProjectSelector } from "@/components/review/mera-project-selector"
 import { OrderListHeader } from "@/components/review/order-list-header"
 import { OrderList } from "@/components/review/order-list"
 import { SyncStatusIndicator } from "@/components/sync-status-indicator"
@@ -842,38 +843,17 @@ export default function ReviewPage() {
 
         {/* Mera source — project selector */}
         {dataSource === "mera" && (
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-700 shrink-0">Project</label>
-              {meraProjectsLoading ? (
-                <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
-              ) : (
-                <select
-                  value={meraProjectId}
-                  onChange={(e) => {
-                    setMeraProjectId(e.target.value)
-                    setMeraParams((p) => ({ ...p, page: 1 }))
-                  }}
-                  className="flex-1 max-w-xs rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— All projects —</option>
-                  {meraProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button
-                onClick={handleMeraRefresh}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${meraLoading ? "animate-spin" : ""}`} />
-                Refresh
-              </button>
-              {meraError && <span className="text-sm text-red-500">{meraError}</span>}
-            </div>
-          </div>
+          <MeraProjectSelector
+            projects={meraProjects}
+            projectsLoading={meraProjectsLoading}
+            selectedProjectId={meraProjectId}
+            onProjectSelect={(projectId) => {
+              setMeraProjectId(projectId)
+              setMeraParams((p) => ({ ...p, page: 1 }))
+            }}
+            ordersLoading={meraLoading}
+            error={meraError}
+          />
         )}
 
         {/* Mera order list */}
