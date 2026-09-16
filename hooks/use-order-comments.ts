@@ -22,7 +22,7 @@ export function useOrderComments(itemId: string) {
 
     try {
       setLoading(true)
-      const response = await fetch(`/api/comments/${itemId}`, {
+      const response = await fetch(`/api/comments/${encodeURIComponent(itemId)}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -53,7 +53,7 @@ export function useOrderComments(itemId: string) {
 
       try {
         setSubmitting(true)
-        const response = await fetch(`/api/comments/${itemId}`, {
+        const response = await fetch(`/api/comments/${encodeURIComponent(itemId)}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

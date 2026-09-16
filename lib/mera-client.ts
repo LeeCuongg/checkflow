@@ -127,11 +127,11 @@ class MeraClient {
   }
 
   async patchOrder(actor: MeraActor, orderId: string, body: MeraPatchOrderBody): Promise<MeraOrder> {
-    return this.request<MeraOrder>("PATCH", `/api/v2/orders/${orderId}`, { actor, body })
+    return this.request<MeraOrder>("PATCH", `/api/v2/orders/${encodeURIComponent(orderId)}`, { actor, body })
   }
 
   async patchItem(actor: MeraActor, itemKey: string, body: MeraPatchItemBody): Promise<MeraOrderItem> {
-    return this.request<MeraOrderItem>("PATCH", `/api/v2/order-items/${itemKey}`, { actor, body })
+    return this.request<MeraOrderItem>("PATCH", `/api/v2/order-items/${encodeURIComponent(itemKey)}`, { actor, body })
   }
 
   async bulkPatchItems(
@@ -141,7 +141,7 @@ class MeraClient {
   ): Promise<{ items: MeraOrderItem[] }> {
     return this.request<{ items: MeraOrderItem[] }>(
       "PATCH",
-      `/api/v2/orders/${orderId}/items/bulk`,
+      `/api/v2/orders/${encodeURIComponent(orderId)}/items/bulk`,
       { actor, body }
     )
   }

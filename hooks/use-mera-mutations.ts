@@ -47,7 +47,7 @@ export function useMeraMutations() {
       setLoading(true)
       try {
         const result = await fetchMera<MeraOrder>(
-          `/api/mera/orders/${orderId}`,
+          `/api/mera/orders/${encodeURIComponent(orderId)}`,
           token,
           body
         )
@@ -79,7 +79,7 @@ export function useMeraMutations() {
       setLoading(true)
       try {
         const result = await fetchMera<MeraOrderItem>(
-          `/api/mera/order-items/${itemKey}`,
+          `/api/mera/order-items/${encodeURIComponent(itemKey)}`,
           token,
           body
         )
@@ -111,7 +111,7 @@ export function useMeraMutations() {
       setLoading(true)
       try {
         const result = await fetchMera<{ items: MeraOrderItem[] }>(
-          `/api/mera/orders/${orderId}/items/bulk`,
+          `/api/mera/orders/${encodeURIComponent(orderId)}/items/bulk`,
           token,
           body
         )
