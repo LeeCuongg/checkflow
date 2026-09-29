@@ -75,7 +75,12 @@ export function PreviewStrip({
   ]
 
   return (
-    <div ref={boxRef} className="grid grid-cols-3 gap-2">
+    // Inline grid: three columns side by side no matter which utility classes the build emitted.
+    <div
+      ref={boxRef}
+      className="gap-2 w-full"
+      style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
+    >
       {tiles.map((t) =>
         t.url ? (
           <div
