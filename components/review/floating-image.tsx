@@ -23,7 +23,7 @@ interface FloatingImageProps {
 const FLOAT_SETTINGS_KEY = "orderReviewFloatSettings"
 const FLOAT_MODE_KEY = "orderReviewFloatSettingsMode"
 
-type BackgroundMode = "transparent" | "pattern" | "chroma"
+type BackgroundMode = "transparent" | "pattern" | "chroma" | "black"
 
 interface FloatSettings {
   x: number
@@ -266,14 +266,16 @@ export function FloatingImage({
     setBackgroundMode((prev) => {
       if (prev === "transparent") return "pattern"
       if (prev === "pattern") return "chroma"
+      if (prev === "chroma") return "black"
       return "transparent"
     })
   }
 
   const getBackgroundTitle = () => {
     if (backgroundMode === "transparent") return "Background: Transparent (click for pattern)"
-    if (backgroundMode === "pattern") return "Background: Pattern (click for chroma blue)"
-    return "Background: Chroma Blue (click for transparent)"
+    if (backgroundMode === "pattern") return "Background: Pattern (click for chroma green)"
+    if (backgroundMode === "chroma") return "Background: Chroma Green (click for black)"
+    return "Background: Black (click for transparent)"
   }
 
   const getImageSource = () => {
@@ -437,7 +439,13 @@ export function FloatingImage({
           backgroundSize: backgroundMode === "pattern" ? "20px 20px" : "auto",
           backgroundPosition: backgroundMode === "pattern" ? "0 0, 0 10px, 10px -10px, -10px 0px" : "0 0",
           backgroundColor:
-            backgroundMode === "pattern" ? "#f9fafb" : backgroundMode === "chroma" ? "#00ff00" : "transparent",
+            backgroundMode === "pattern"
+              ? "#f9fafb"
+              : backgroundMode === "chroma"
+                ? "#00ff00"
+                : backgroundMode === "black"
+                  ? "#000000"
+                  : "transparent",
         }}
       >
         <div
