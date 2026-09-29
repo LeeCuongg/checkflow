@@ -11,6 +11,7 @@ import { ExternalLink, User, Calendar, Store, Package, Copy, CheckCheck } from "
 import { formatDistanceToNow } from "date-fns"
 import type { Order } from "@/types/order"
 import { isAmazonOrder, listingUrl, listingUrlTitle } from "@/lib/listing-url"
+import { isMeraOrder, useNoNeedDesignProductTypes } from "@/hooks/use-no-need-design-product-types"
 
 interface OrderListItemProps {
   order: Order
@@ -18,6 +19,9 @@ interface OrderListItemProps {
 
 export function OrderListItem({ order }: OrderListItemProps) {
   const [copiedItemId, setCopiedItemId] = useState(false)
+  // Shared, once-per-session list (module cache) — not one request per row.
+  const { lookup: lookupNoNeedDesign } = useNoNeedDesignProductTypes({ enabled: isMeraOrder(order) })
+  const noNeedDesignProductType = lookupNoNeedDesign(order)
 
   const getStatusBadge = (status: Order["status"]) => {
     switch (status) {
@@ -151,6 +155,15 @@ export function OrderListItem({ order }: OrderListItemProps) {
               </Button>
             </div>
             {getStatusBadge(order.status)}
+            {noNeedDesignProductType && (
+              <Badge
+                variant="outline"
+                className="text-xs bg-amber-50 text-amber-700 border-amber-200"
+                title={`Đơn dùng BASE TEMPLATE (${noNeedDesignProductType.displayName}) — duyệt ở màn Base Templates`}
+              >
+                NO NEED DESIGN
+              </Badge>
+            )}
             {order.designer && (
               <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200">
                 <User className="w-3 h-3 mr-1" />
