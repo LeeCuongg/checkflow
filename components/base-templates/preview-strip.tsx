@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { parseDesignLinks, resolveDesignUrls } from "@/utils/design-links"
+import { useImageEpoch } from "@/hooks/use-image-refresh"
 
 type Tile = { key: string; label: string; url?: string; loading?: boolean; linkUrl?: string }
 
 // First viewable file of a design/mockup link (a Drive folder resolves to its files; the
 // resolver caches per link). Idle until `enabled`.
 function useFirstFile(raw: string | undefined, enabled: boolean): { url?: string; loading: boolean } {
+  const imageEpoch = useImageEpoch()
   const [state, setState] = useState<{ url?: string; loading: boolean }>({ loading: false })
   useEffect(() => {
     if (!enabled || parseDesignLinks(raw).length === 0) {
@@ -23,7 +25,7 @@ function useFirstFile(raw: string | undefined, enabled: boolean): { url?: string
     return () => {
       cancelled = true
     }
-  }, [raw, enabled])
+  }, [raw, enabled, imageEpoch])
   return state
 }
 

@@ -13,6 +13,7 @@ import {
   EyeOff,
   Loader2,
   Maximize,
+  RefreshCw,
   Wrench,
   X,
 } from "lucide-react"
@@ -26,6 +27,7 @@ import { DEFAULT_WIDTHS } from "@/constants/review-modal"
 import { useApi } from "@/hooks/use-api"
 import { useDesignLinks } from "@/hooks/use-design-links"
 import { useImageCache } from "@/hooks/use-image-cache"
+import { refreshImages } from "@/hooks/use-image-refresh"
 import { toast } from "@/hooks/use-toast"
 import { useBaseTemplateSampleOrder, sampleItemKeyOf } from "@/hooks/use-base-template-sample-order"
 import { copyVisibleImageToClipboard } from "@/utils/screenshot"
@@ -429,6 +431,9 @@ export function BaseTemplateReviewModal({
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={refreshImages} title="Tải lại ảnh (design / mockup / product)">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen (F)">
               <Maximize className="h-4 w-4" />
             </Button>

@@ -11,6 +11,7 @@ import { ALL_STATUSES } from "@/constants/statuses"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
+import { refreshImages } from "@/hooks/use-image-refresh"
 import { useDesignLinks } from "@/hooks/use-design-links"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
@@ -769,6 +770,9 @@ export function OrderReviewModal({
                 <FileSpreadsheet className="h-4 w-4" />
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={refreshImages} title="Tải lại ảnh (design / mockup / product)">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen (F)">
               <Maximize className="h-4 w-4" />
             </Button>
