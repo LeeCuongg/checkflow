@@ -7,12 +7,23 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ALL_STATUSES } from "@/constants/statuses"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
 import { refreshImages } from "@/hooks/use-image-refresh"
 import { useDesignLinks } from "@/hooks/use-design-links"
+import { isMeraOrder, useNoNeedDesignProductTypes } from "@/hooks/use-no-need-design-product-types"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
   X,
@@ -30,6 +41,7 @@ import {
   AlertCircle,
   RefreshCw,
   FileSpreadsheet,
+  ExternalLink,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -48,6 +60,26 @@ import { useOrderReviewPresence } from "@/hooks/use-order-review-presence"
 // import { useGlobalPresence } from "@/hooks/use-global-presence"
 import { PresenceAvatars } from "./presence-avatars"
 import { copyVisibleImageToClipboard } from "@/utils/screenshot"
+
+// A status change requested from the modal (see requestStatusChange).
+type StatusChangeRequest =
+  | { kind: "confirm" }
+  | { kind: "direct_repair"; repairType: "design_error" | "customer_change" }
+  | { kind: "need_repair" }
+  | { kind: "status"; status: Order["status"] }
+
+function statusChangeLabel(request: StatusChangeRequest): string {
+  switch (request.kind) {
+    case "confirm":
+      return "CONFIRMED"
+    case "direct_repair":
+      return `NEED REPAIR (${request.repairType === "design_error" ? "DESIGN ERROR" : "CUSTOMER"})`
+    case "need_repair":
+      return "NEED REPAIR"
+    case "status":
+      return request.status
+  }
+}
 
 export function OrderReviewModal({
   isOpen,
@@ -107,6 +139,32 @@ export function OrderReviewModal({
 
   const { reviewingUsers, setTypingStatus } = useOrderReviewPresence(order.itemId, isOpen)
   // const { onlineUsers } = useGlobalPresence(isOpen)
+
+  // NO NEED DESIGN orders (BASE TEMPLATE product types) are reviewed on /base-templates. Every
+  // status change of such an order from this modal first asks for confirmation. Unknown (list
+  // not loaded / failed) = not flagged, so nothing is ever blocked on a guess.
+  const { lookup: lookupNoNeedDesign } = useNoNeedDesignProductTypes({ enabled: isMeraOrder(order) })
+  const noNeedDesignProductType = lookupNoNeedDesign(order)
+  const [pendingStatusChange, setPendingStatusChange] = useState<StatusChangeRequest | null>(null)
+  // Read by the document keydown listener: while the confirmation is open, modal shortcuts pause.
+  const statusConfirmOpenRef = useRef(false)
+  statusConfirmOpenRef.current = pendingStatusChange !== null
+
+  // Every status change of this modal goes through here: it runs right away, or — for a NO NEED
+  // DESIGN order — only after the checker confirms. The request (not a closure) is stored, so
+  // the confirmed action runs with the latest props, exactly as a direct click would.
+  const requestStatusChange = (request: StatusChangeRequest) => {
+    if (noNeedDesignProductType) {
+      setPendingStatusChange(request)
+      return
+    }
+    runStatusChange(request)
+  }
+
+  // A pending confirmation belongs to the order it was raised on.
+  useEffect(() => {
+    setPendingStatusChange(null)
+  }, [order.itemId])
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -329,6 +387,10 @@ export function OrderReviewModal({
   }
 
   const handleDirectRepair = (type: "design_error" | "customer_change") => {
+    requestStatusChange({ kind: "direct_repair", repairType: type })
+  }
+
+  const doDirectRepair = (type: "design_error" | "customer_change") => {
     const currentNoteValue = orderNoteTextareaRef.current?.value || ""
     const noteChanged = currentNoteValue !== (order.orderNote || "")
     const noteToSend = noteChanged ? currentNoteValue : order.orderNote
@@ -336,6 +398,10 @@ export function OrderReviewModal({
   }
 
   const handleConfirm = () => {
+    requestStatusChange({ kind: "confirm" })
+  }
+
+  const doConfirm = () => {
     const currentNoteValue = orderNoteTextareaRef.current?.value || ""
     const noteChanged = currentNoteValue !== (order.orderNote || "")
     const noteToSend = noteChanged ? currentNoteValue : order.orderNote
@@ -371,6 +437,14 @@ export function OrderReviewModal({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
+      // NO NEED DESIGN confirmation open: its own buttons / Esc handle the keys. The target check
+      // also covers the Esc that just closed it (the ref may already be reset by then).
+      if (
+        statusConfirmOpenRef.current ||
+        (e.target instanceof Element && e.target.closest('[role="alertdialog"]'))
+      ) {
+        return
+      }
 
       switch (e.key) {
         case "1":
@@ -443,10 +517,16 @@ export function OrderReviewModal({
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [isOpen, showRepairOptions, viewMode, onNext, onPrevious, onClose])
+    // noNeedDesignProductType: the list loads inside this component (parent does not re-render),
+    // so re-register or key "1" would keep a handleConfirm from before it was known.
+  }, [isOpen, showRepairOptions, viewMode, onNext, onPrevious, onClose, noNeedDesignProductType])
 
   const handleNeedRepair = () => {
     if (!repairType) return
+    requestStatusChange({ kind: "need_repair" })
+  }
+
+  const doNeedRepair = () => {
     const noteChanged = orderNote !== (order.orderNote || "")
     onAction("need_repair")
     setShowRepairOptions(false)
@@ -466,6 +546,10 @@ export function OrderReviewModal({
       return // No change needed
     }
 
+    requestStatusChange({ kind: "status", status: typedStatus })
+  }
+
+  const applyStatusChange = (typedStatus: Order["status"]) => {
     setCurrentStatus(typedStatus)
 
     if (typedStatus === "NEED REPAIR") {
@@ -478,6 +562,23 @@ export function OrderReviewModal({
       const noteChanged = orderNote !== (order.orderNote || "")
       const noteToUpdate = noteChanged ? orderNote : order.orderNote
       onStatusUpdate(typedStatus, noteToUpdate)
+    }
+  }
+
+  function runStatusChange(request: StatusChangeRequest) {
+    switch (request.kind) {
+      case "confirm":
+        doConfirm()
+        break
+      case "direct_repair":
+        doDirectRepair(request.repairType)
+        break
+      case "need_repair":
+        doNeedRepair()
+        break
+      case "status":
+        applyStatusChange(request.status)
+        break
     }
   }
 
@@ -787,6 +888,28 @@ export function OrderReviewModal({
             </Button>
           </div>
         </div>
+
+        {noNeedDesignProductType && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+              <p className="text-sm text-amber-900">
+                <span className="font-semibold">NO NEED DESIGN</span> — đơn dùng BASE TEMPLATE (
+                <span className="font-medium">{noNeedDesignProductType.displayName}</span>). Duyệt ở màn{" "}
+                <a
+                  href="/base-templates"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-amber-700 underline hover:text-amber-800 inline-flex items-center gap-1"
+                >
+                  Base Templates
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        )}
 
         {showItemIdChangeNotification && order._itemIdChanged && (
           <div className="bg-red-50 border-b border-red-200 px-4 py-3">
@@ -1143,6 +1266,68 @@ export function OrderReviewModal({
             />
           </div>
         </div>
+
+        {/* NO NEED DESIGN: confirm before any status change. Radix focuses Cancel on open, so an
+            accidental Enter / Space cancels; Esc cancels too. */}
+        <AlertDialog
+          open={pendingStatusChange !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingStatusChange(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <span>Đơn NO NEED DESIGN có BASE TEMPLATE. Bạn có chắc muốn đổi trạng thái?</span>
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>
+                    Product type:{" "}
+                    <span className="font-semibold text-gray-900">
+                      {noNeedDesignProductType?.displayName ?? order.productType}
+                    </span>
+                    {noNeedDesignProductType && noNeedDesignProductType.displayName !== noNeedDesignProductType.slug && (
+                      <span className="font-mono text-xs text-gray-500"> ({noNeedDesignProductType.slug})</span>
+                    )}
+                  </p>
+                  {pendingStatusChange && (
+                    <p>
+                      Trạng thái mới:{" "}
+                      <span className="font-semibold text-gray-900">{statusChangeLabel(pendingStatusChange)}</span>
+                    </p>
+                  )}
+                  <p className="text-amber-800">
+                    Đơn loại này nên được duyệt ở màn{" "}
+                    <a
+                      href="/base-templates"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-amber-700 underline hover:text-amber-800"
+                    >
+                      Base Templates
+                    </a>
+                    .
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Huỷ</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={() => {
+                  const request = pendingStatusChange
+                  setPendingStatusChange(null)
+                  if (request) runStatusChange(request)
+                }}
+              >
+                Vẫn đổi trạng thái
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   )
