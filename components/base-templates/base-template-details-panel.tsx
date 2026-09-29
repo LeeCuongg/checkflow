@@ -9,6 +9,8 @@ import { formatDate } from "@/utils/format-utils"
 import type { ProductTypeNoteResponse } from "@/types/order-review"
 import type { BaseTemplateProductType, BaseTemplateVariant } from "@/types/mera-base-template"
 import type { SampleOrderState } from "@/hooks/use-base-template-sample-order"
+import type { PendingOrdersState } from "@/hooks/use-base-template-pending-orders"
+import { PendingOrdersSection } from "./pending-orders-section"
 import { countriesLabel, statusLabel } from "./utils"
 
 // Status pill in the same style as the order review screen (dot + colored badge).
@@ -34,6 +36,7 @@ interface BaseTemplateDetailsPanelProps {
   pt: BaseTemplateProductType
   variant: BaseTemplateVariant
   sample: SampleOrderState
+  pendingOrders: PendingOrdersState
   productTypeNoteData: ProductTypeNoteResponse | null
   productTypeNoteLoading: boolean
   productTypeNoteError: string | null
@@ -44,15 +47,18 @@ interface BaseTemplateDetailsPanelProps {
   activeImageUrl?: string
   // Click = show it large in the image viewer (Product tab).
   onShowImage: (url: string) => void
+  // Photo of a waiting order (product / customer): shown large in the Product tab too.
+  onShowOrderImage: (url: string, label: string, source: "order" | "customer") => void
 }
 
 // Right column of the base template review modal — laid out like OrderDetailsPanel:
-// Details → Mockup & Design Links → Note for <product type> (shared component, same note
+// Details → waiting orders → Mockup & Design Links → Note for <product type> (shared component, same note
 // as the order review screen) → history (like "Order History").
 export function BaseTemplateDetailsPanel({
   pt,
   variant,
   sample,
+  pendingOrders,
   productTypeNoteData,
   productTypeNoteLoading,
   productTypeNoteError,
@@ -61,6 +67,7 @@ export function BaseTemplateDetailsPanel({
   productTypeImages,
   activeImageUrl,
   onShowImage,
+  onShowOrderImage,
 }: BaseTemplateDetailsPanelProps) {
   const sampleOrder = sample.order
   const storeListingUrl = sampleOrder ? listingUrl(sampleOrder) : null
@@ -170,6 +177,15 @@ export function BaseTemplateDetailsPanel({
           )}
         </div>
       </div>
+
+      {/* Waiting orders of this variant — check them directly before approving */}
+      <PendingOrdersSection
+        state={pendingOrders}
+        pendingCount={variant.pending_count ?? 0}
+        getCachedImageUrl={getCachedImageUrl}
+        activeImageUrl={activeImageUrl}
+        onShowImage={onShowOrderImage}
+      />
 
       {/* Mockup & Design Links (read-only: the template is edited in Mera) */}
       <div className="border-b border-gray-200">

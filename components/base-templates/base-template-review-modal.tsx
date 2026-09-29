@@ -30,6 +30,7 @@ import { useImageCache } from "@/hooks/use-image-cache"
 import { refreshImages } from "@/hooks/use-image-refresh"
 import { toast } from "@/hooks/use-toast"
 import { useBaseTemplateSampleOrder, sampleItemKeyOf } from "@/hooks/use-base-template-sample-order"
+import { useBaseTemplatePendingOrders } from "@/hooks/use-base-template-pending-orders"
 import { copyVisibleImageToClipboard } from "@/utils/screenshot"
 import type { Order } from "@/types/order"
 import type { ActiveTab, ProductTypeNoteResponse, ViewMode } from "@/types/order-review"
@@ -45,7 +46,8 @@ import {
   statusOf,
 } from "./utils"
 
-type GallerySource = "variant" | "pending" | "pt"
+// "order" / "customer" = a photo opened from the "Đơn chờ duyệt" block (added on demand).
+type GallerySource = "variant" | "pending" | "pt" | "order" | "customer"
 
 interface GalleryImage {
   url: string
@@ -53,7 +55,13 @@ interface GalleryImage {
   label: string
 }
 
-const SOURCE_BADGE: Record<GallerySource, string | null> = { variant: null, pending: "chờ", pt: "PT" }
+const SOURCE_BADGE: Record<GallerySource, string | null> = {
+  variant: null,
+  pending: "chờ",
+  pt: "PT",
+  order: "đơn",
+  customer: "khách",
+}
 
 // Own key: resizing here must not move the order review modal's columns.
 const COLUMN_WIDTHS_KEY = "base-template-modal-column-widths"
@@ -122,6 +130,8 @@ export function BaseTemplateReviewModal({
   const [productIndex, setProductIndex] = useState(0)
   const [copiedSlug, setCopiedSlug] = useState(false)
   const [showApproved, setShowApproved] = useState(false)
+  // Photos opened from the waiting-orders block that the gallery did not already have.
+  const [extraImages, setExtraImages] = useState<GalleryImage[]>([])
   const [columnWidths, setColumnWidths] = useState(DEFAULT_WIDTHS)
   const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null)
   const [startX, setStartX] = useState(0)
@@ -138,6 +148,15 @@ export function BaseTemplateReviewModal({
     sampleItemKeyOf(variant),
     pt.slug,
     variant.base_template_design
+  )
+
+  const pendingOrders = useBaseTemplatePendingOrders(
+    isOpen ? entry.key : null,
+    pt.project_id,
+    pt.slug,
+    variant.base_template_design,
+    variant.pending_count ?? 0,
+    variant.base_template_status
   )
 
   const {
@@ -166,8 +185,9 @@ export function BaseTemplateReviewModal({
       add(pv.image_link, "pending", `Giá trị chờ: ${pv.label || pv.signature || "(không có trường phân biệt)"}`)
     }
     for (const u of pt.image_links ?? []) add(u, "pt", "Ảnh product type")
+    for (const img of extraImages) add(img.url, img.source, img.label)
     return out
-  }, [variant.image_links, variant.pending_values, pt.image_links])
+  }, [variant.image_links, variant.pending_values, pt.image_links, extraImages])
 
   const safeProductIndex = gallery.length > 0 ? Math.min(productIndex, gallery.length - 1) : 0
   const currentProductUrl = gallery[safeProductIndex]?.url
@@ -178,6 +198,20 @@ export function BaseTemplateReviewModal({
     const idx = url ? gallery.findIndex((g) => g.url === url.trim()) : -1
     if (idx < 0) return
     setProductIndex(idx)
+    setActiveTab("product")
+  }
+  // Same, for a waiting order's photo: appended to the gallery first when it is not there
+  // (deduped by URL, so it lands exactly at the current gallery length).
+  const showOrderImage = (raw: string, label: string, source: "order" | "customer") => {
+    const url = raw.trim()
+    if (!url) return
+    const idx = gallery.findIndex((g) => g.url === url)
+    if (idx >= 0) {
+      setProductIndex(idx)
+    } else {
+      setExtraImages((prev) => [...prev, { url, source, label }])
+      setProductIndex(gallery.length)
+    }
     setActiveTab("product")
   }
   const showImageRef = useRef(showImage)
@@ -209,6 +243,7 @@ export function BaseTemplateReviewModal({
     setPanY(0)
     setRotation(0)
     setShowApproved(false)
+    setExtraImages([])
   }, [entry.key])
 
   // Declared after the reset above, so on open (same commit) it runs last and wins.
@@ -767,6 +802,7 @@ export function BaseTemplateReviewModal({
               pt={pt}
               variant={variant}
               sample={sample}
+              pendingOrders={pendingOrders}
               productTypeNoteData={productTypeNoteData}
               productTypeNoteLoading={productTypeNoteLoading}
               productTypeNoteError={productTypeNoteError}
@@ -775,6 +811,7 @@ export function BaseTemplateReviewModal({
               productTypeImages={ptImages}
               activeImageUrl={activeTab === "product" ? currentProductUrl : undefined}
               onShowImage={showImage}
+              onShowOrderImage={showOrderImage}
             />
           </div>
         </div>
