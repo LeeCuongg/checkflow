@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import { useMeraBaseTemplates, type BaseTemplateActionOutcome } from "@/hooks/use-mera-base-templates"
+import { useMeraProjects } from "@/hooks/use-mera-projects"
 import { BaseTemplateListItem } from "@/components/base-templates/base-template-list-item"
 import { BaseTemplateReviewModal } from "@/components/base-templates/base-template-review-modal"
 import { NeedRepairDialog } from "@/components/base-templates/need-repair-dialog"
@@ -23,6 +25,9 @@ import {
 type QueueTab = "queue" | "repair"
 
 const SEARCH_DEBOUNCE_MS = 400
+const PROJECT_FILTER_KEY = "base-templates-project-filter"
+// Radix Select cannot hold "" as an item value.
+const ALL_PROJECTS = "__all__"
 
 function conflictOrError(outcome: Extract<BaseTemplateActionOutcome, { ok: false }>): {
   conflict: boolean
@@ -49,11 +54,50 @@ export default function BaseTemplatesPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [repairOpen, setRepairOpen] = useState(false)
   const [busy, setBusy] = useState<"confirm" | "repair" | null>(null)
+  // Image to show first in the Product tab when the review opens from a thumbnail click.
+  const [focusImage, setFocusImage] = useState<{ key: string; url: string } | null>(null)
+  // "" = every project. Read back from localStorage before the first load, so a checker who
+  // works one project does not first pull the whole queue.
+  const [projectId, setProjectId] = useState("")
+  const [projectRestored, setProjectRestored] = useState(false)
   const lastIndexRef = useRef(0)
   const rowRefs = useRef(new Map<string, HTMLDivElement>())
 
-  // Always every project: the queue is small, and each row names its project.
-  const bt = useMeraBaseTemplates({ projectId: "", search })
+  const { projects, loading: projectsLoading, error: projectsError } = useMeraProjects()
+  const bt = useMeraBaseTemplates({ projectId, search, enabled: projectRestored })
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PROJECT_FILTER_KEY)
+      if (saved) setProjectId(saved)
+    } catch {
+      // storage unavailable — every project
+    }
+    setProjectRestored(true)
+  }, [])
+
+  const changeProject = useCallback((value: string) => {
+    const next = value === ALL_PROJECTS ? "" : value
+    setProjectId(next)
+    try {
+      if (next) localStorage.setItem(PROJECT_FILTER_KEY, next)
+      else localStorage.removeItem(PROJECT_FILTER_KEY)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  // A saved project that no longer exists (or the checker lost access) → back to all.
+  useEffect(() => {
+    if (!projectId || projectsLoading || projectsError || projects.length === 0) return
+    if (!projects.some((p) => p.id === projectId)) changeProject(ALL_PROJECTS)
+  }, [projectId, projects, projectsLoading, projectsError, changeProject])
+
+  const sortedProjects = useMemo(
+    () => [...projects].sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id)),
+    [projects]
+  )
+  const selectedProjectName = projectId ? projects.find((p) => p.id === projectId)?.name : undefined
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS)
@@ -99,10 +143,11 @@ export default function BaseTemplatesPage() {
   }, [entries, selectedIndex])
 
   const openReview = useCallback(
-    (key?: string) => {
+    (key?: string, imageUrl?: string) => {
       const target = key ?? selectedKey ?? entries[0]?.key
       if (!target) return
       setSelectedKey(target)
+      setFocusImage(imageUrl ? { key: target, url: imageUrl } : null)
       setReviewOpen(true)
     },
     [selectedKey, entries]
@@ -246,8 +291,8 @@ export default function BaseTemplatesPage() {
     if (reviewOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Enter" || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
-      // A focused row / button handles its own Enter.
-      if (e.target instanceof HTMLElement && e.target.closest("button, a, [role='button']")) return
+      // A focused row / button / open dropdown (project filter) handles its own Enter.
+      if (e.target instanceof HTMLElement && e.target.closest("button, a, [role='button'], [role='option'], [role='listbox']")) return
       e.preventDefault()
       openReview()
     }
@@ -291,6 +336,11 @@ export default function BaseTemplatesPage() {
                 <span className="text-sm text-gray-600">
                   {entries.length.toLocaleString()} variant{tab === "queue" ? " cần duyệt" : " chờ designer sửa"}
                 </span>
+                {projectId && (
+                  <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
+                    project: {selectedProjectName || projectId}
+                  </Badge>
+                )}
                 {search.trim() && (
                   <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200">
                     tìm: {search.trim()}
@@ -317,8 +367,25 @@ export default function BaseTemplatesPage() {
               </div>
             </div>
 
-            {/* Search + tabs */}
+            {/* Project + search + tabs */}
             <div className="flex items-center gap-4 flex-wrap">
+              <Select value={projectId || ALL_PROJECTS} onValueChange={changeProject}>
+                <SelectTrigger className="w-[220px] border-gray-300" title={projectsError ? `Không tải được project: ${projectsError}` : undefined}>
+                  <SelectValue placeholder="Tất cả project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_PROJECTS}>Tất cả project</SelectItem>
+                  {/* Saved project not in the list (yet): keep it selectable so the trigger has a label. */}
+                  {projectId && !projects.some((p) => p.id === projectId) && (
+                    <SelectItem value={projectId}>{projectsLoading ? "Đang tải..." : projectId}</SelectItem>
+                  )}
+                  {sortedProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name || p.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="flex-1 min-w-[240px] relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -391,7 +458,13 @@ export default function BaseTemplatesPage() {
                 <h3 className="text-xl font-semibold text-gray-900">
                   {tab === "queue" ? "Không có base template nào cần duyệt." : "Không có template nào chờ designer sửa."}
                 </h3>
-                {search.trim() && <p className="text-sm text-gray-500 mt-2">Thử bỏ bớt từ khoá tìm kiếm.</p>}
+                {(search.trim() || projectId) && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    {projectId
+                      ? "Đang lọc theo một project — thử chọn “Tất cả project”."
+                      : "Thử bỏ bớt từ khoá tìm kiếm."}
+                  </p>
+                )}
               </div>
             </div>
           </Card>
@@ -406,8 +479,8 @@ export default function BaseTemplatesPage() {
                 }}
                 entry={entry}
                 selected={entry.key === selectedKey}
-                showProject
-                onOpen={() => openReview(entry.key)}
+                showProject={!projectId}
+                onOpen={(imageUrl) => openReview(entry.key, imageUrl)}
               />
             ))}
           </div>
@@ -416,8 +489,12 @@ export default function BaseTemplatesPage() {
         {reviewOpen && selected && (
           <BaseTemplateReviewModal
             isOpen={reviewOpen}
-            onClose={() => setReviewOpen(false)}
+            onClose={() => {
+              setReviewOpen(false)
+              setFocusImage(null)
+            }}
             entry={selected}
+            focusImageUrl={focusImage && focusImage.key === selected.key ? focusImage.url : null}
             currentIndex={selectedIndex}
             totalCount={entries.length}
             onNext={goNext}

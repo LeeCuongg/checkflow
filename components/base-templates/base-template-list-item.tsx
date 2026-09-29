@@ -15,7 +15,47 @@ interface BaseTemplateListItemProps {
   entry: QueueEntry
   selected: boolean
   showProject: boolean
-  onOpen: () => void
+  // imageUrl = a thumbnail was clicked: open the review with that image in the Product tab.
+  onOpen: (imageUrl?: string) => void
+}
+
+// Small clickable photo (Drive links go through the /api/drive-image proxy inside LazyImage).
+function Thumb({
+  url,
+  label,
+  className,
+  onOpen,
+}: {
+  url: string
+  label: string
+  className?: string
+  onOpen: (imageUrl: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onOpen(url)
+      }}
+      className={cn(
+        "flex-shrink-0 rounded border border-gray-200 overflow-hidden bg-white hover:border-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+        className
+      )}
+      title={`${label} — bấm để xem lớn`}
+    >
+      <LazyImage
+        src={url}
+        alt={label}
+        className="w-full h-full"
+        fit="cover"
+        previewSize={200}
+        fullSize={200}
+        fallbackSrc="/placeholder.svg?height=40&width=40&text=%3F"
+      />
+    </button>
+  )
 }
 
 // One reviewable variant, styled like OrderListItem on /review. Click / Enter opens the
@@ -28,7 +68,10 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
   const [copiedSlug, setCopiedSlug] = useState(false)
   const status = statusOf(variant)
   const pendingValues = variant.pending_values ?? []
-  const productImage = (variant.image_links ?? [])[0] || (pt.image_links ?? [])[0]
+  // Product type photo sits next to the name; the right column shows photos of orders that
+  // match this variant.
+  const ptImage = (pt.image_links ?? []).find(Boolean)
+  const productImage = (variant.image_links ?? []).find(Boolean)
 
   const stop = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -56,7 +99,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
       ref={ref}
       role="button"
       tabIndex={0}
-      onClick={onOpen}
+      onClick={() => onOpen()}
       onKeyDown={(e) => {
         if (e.key === "Enter" && e.target === e.currentTarget) {
           e.preventDefault()
@@ -73,6 +116,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
         <div className="flex items-start justify-between mb-3 gap-3">
           <div className="flex items-center gap-3 flex-wrap min-w-0">
             <div className="flex items-center gap-2 min-w-0">
+              {ptImage && <Thumb url={ptImage} label="Ảnh product type" className="w-9 h-9" onOpen={onOpen} />}
               <h3 className="font-semibold text-gray-900 text-lg truncate">{pt.display_name || pt.slug}</h3>
               <Button
                 variant="ghost"
@@ -128,12 +172,18 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
                     <span
                       key={pv.signature}
                       className={cn(
-                        "text-xs rounded px-1.5 py-0.5 border",
+                        "text-xs rounded border inline-flex items-center gap-1.5",
+                        pv.image_link ? "pl-0.5 pr-1.5 py-0.5" : "px-1.5 py-0.5",
                         pv.approved ? "bg-white text-gray-600 border-gray-200" : "bg-amber-50 text-amber-800 border-amber-200"
                       )}
                       title={pv.approved ? "đã duyệt – đơn tồn" : "giá trị mới"}
                     >
-                      {pv.label || pv.signature || "(không có trường phân biệt)"} · {pv.count}
+                      {pv.image_link && (
+                        <Thumb url={pv.image_link} label={`Ảnh đơn mẫu ${pv.sample_item_key}`} className="w-7 h-7" onOpen={onOpen} />
+                      )}
+                      <span>
+                        {pv.label || pv.signature || "(không có trường phân biệt)"} · {pv.count}
+                      </span>
                     </span>
                   ))}
                   {pendingValues.length > 8 && (
@@ -193,7 +243,13 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
               )}
             </div>
             {productImage && (
-              <div className="relative w-1/2">
+              <div
+                className="relative w-1/2"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpen(productImage)
+                }}
+              >
                 <LazyImage
                   src={productImage}
                   alt="Product"
