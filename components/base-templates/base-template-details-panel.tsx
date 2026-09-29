@@ -2,6 +2,7 @@
 
 import { ExternalLink, FileText, Clock, User, LinkIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { LazyImage } from "@/components/ui/lazy-image"
 import { ProductTypeNoteSection } from "@/components/review/product-type-note-section"
 import { listingUrl, listingUrlTitle } from "@/lib/listing-url"
 import { formatDate } from "@/utils/format-utils"
@@ -38,6 +39,11 @@ interface BaseTemplateDetailsPanelProps {
   productTypeNoteError: string | null
   refetchProductTypeNote: () => void
   getCachedImageUrl: (url: string | null | undefined) => string | null
+  // The product type's own photos (Mera `image_links` on the product type). Empty = hidden.
+  productTypeImages: string[]
+  activeImageUrl?: string
+  // Click = show it large in the image viewer (Product tab).
+  onShowImage: (url: string) => void
 }
 
 // Right column of the base template review modal — laid out like OrderDetailsPanel:
@@ -52,6 +58,9 @@ export function BaseTemplateDetailsPanel({
   productTypeNoteError,
   refetchProductTypeNote,
   getCachedImageUrl,
+  productTypeImages,
+  activeImageUrl,
+  onShowImage,
 }: BaseTemplateDetailsPanelProps) {
   const sampleOrder = sample.order
   const storeListingUrl = sampleOrder ? listingUrl(sampleOrder) : null
@@ -129,6 +138,36 @@ export function BaseTemplateDetailsPanel({
               )}
             </div>
           </div>
+
+          {productTypeImages.length > 0 && (
+            <div className="mt-3">
+              <div className="text-xs text-gray-600 mb-1.5">
+                Ảnh product type ({productTypeImages.length}) — bấm để xem lớn
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {productTypeImages.map((url) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => onShowImage(url)}
+                    className={`aspect-square rounded border-2 overflow-hidden bg-white ${
+                      activeImageUrl === url ? "border-blue-500" : "border-gray-200 hover:border-gray-400"
+                    }`}
+                    title="Ảnh product type — bấm để xem lớn"
+                  >
+                    <LazyImage
+                      src={getCachedImageUrl(url) || url}
+                      alt="Ảnh product type"
+                      className="w-full h-full"
+                      fit="cover"
+                      previewSize={400}
+                      fullSize={400}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

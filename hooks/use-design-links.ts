@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { parseDesignLinks, isDriveFolderUrl, resolveDesignUrls } from "@/utils/design-links"
+import { useImageEpoch } from "@/hooks/use-image-refresh"
 
 // Resolve an order's designLink field into a flat list of individual file URLs.
 // Direct links show immediately; folder links are expanded async via the Drive API.
 export function useDesignLinks(designLink?: string | null): string[] {
+  const imageEpoch = useImageEpoch()
   const [urls, setUrls] = useState<string[]>(() =>
     parseDesignLinks(designLink).filter((l) => !isDriveFolderUrl(l)),
   )
@@ -30,7 +32,7 @@ export function useDesignLinks(designLink?: string | null): string[] {
     return () => {
       cancelled = true
     }
-  }, [designLink])
+  }, [designLink, imageEpoch])
 
   return urls
 }

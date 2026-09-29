@@ -11,6 +11,7 @@ import {
   isDriveUrl,
   peekDriveImageUrl,
 } from "@/lib/drive-image"
+import { useImageEpoch } from "@/hooks/use-image-refresh"
 
 interface LazyImageProps {
   src: string
@@ -57,6 +58,7 @@ export function LazyImage({
   const [isDisplayLoaded, setIsDisplayLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
+  const imageEpoch = useImageEpoch()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const retryCountRef = useRef(0)
@@ -109,7 +111,10 @@ export function LazyImage({
     if (!src || !isInView) return
 
     if (!isDriveUrl(src)) {
-      setFullSrc(reloadNonce > 0 ? `${src}${src.includes("?") ? "&" : "?"}r=${reloadNonce}` : src)
+      const bust = [reloadNonce > 0 ? `r=${reloadNonce}` : "", imageEpoch > 0 ? `v=${imageEpoch}` : ""]
+        .filter(Boolean)
+        .join("&")
+      setFullSrc(bust ? `${src}${src.includes("?") ? "&" : "?"}${bust}` : src)
       return
     }
 
@@ -147,7 +152,7 @@ export function LazyImage({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, isInView, reloadNonce, previewSize, fullSize])
+  }, [src, isInView, reloadNonce, previewSize, fullSize, imageEpoch])
 
   const scheduleRetry = () => {
     if (retryCountRef.current >= MAX_RETRIES) return false

@@ -122,8 +122,31 @@ interface DriveImageUrlOptions {
   attempt?: number
 }
 
+// "Tải lại ảnh" epoch. The proxy answers with an immutable cache header, so the browser
+// would keep serving the old bytes of a file that was replaced on Drive; the epoch is part
+// of every proxy URL, and bumping it makes each image a new URL — refetched from Drive.
+let imageEpoch = 0
+const epochListeners = new Set<() => void>()
+
+export function getImageEpoch(): number {
+  return imageEpoch
+}
+
+export function subscribeImageEpoch(listener: () => void): () => void {
+  epochListeners.add(listener)
+  return () => {
+    epochListeners.delete(listener)
+  }
+}
+
+export function bumpImageEpoch() {
+  imageEpoch += 1
+  epochListeners.forEach((l) => l())
+}
+
 function buildUrl(fileId: string, token: string, { size, attempt }: DriveImageUrlOptions = {}) {
   const params = new URLSearchParams({ k: token })
+  if (imageEpoch) params.set("v", String(imageEpoch))
   if (size) params.set("s", String(size))
   if (attempt) params.set("r", String(attempt))
   return `/api/drive-image/${fileId}?${params.toString()}`

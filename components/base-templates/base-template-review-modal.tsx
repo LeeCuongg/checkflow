@@ -13,6 +13,7 @@ import {
   EyeOff,
   Loader2,
   Maximize,
+  RefreshCw,
   Wrench,
   X,
 } from "lucide-react"
@@ -26,6 +27,7 @@ import { DEFAULT_WIDTHS } from "@/constants/review-modal"
 import { useApi } from "@/hooks/use-api"
 import { useDesignLinks } from "@/hooks/use-design-links"
 import { useImageCache } from "@/hooks/use-image-cache"
+import { refreshImages } from "@/hooks/use-image-refresh"
 import { toast } from "@/hooks/use-toast"
 import { useBaseTemplateSampleOrder, sampleItemKeyOf } from "@/hooks/use-base-template-sample-order"
 import { copyVisibleImageToClipboard } from "@/utils/screenshot"
@@ -43,6 +45,16 @@ import {
   statusOf,
 } from "./utils"
 
+type GallerySource = "variant" | "pending" | "pt"
+
+interface GalleryImage {
+  url: string
+  source: GallerySource
+  label: string
+}
+
+const SOURCE_BADGE: Record<GallerySource, string | null> = { variant: null, pending: "chờ", pt: "PT" }
+
 // Own key: resizing here must not move the order review modal's columns.
 const COLUMN_WIDTHS_KEY = "base-template-modal-column-widths"
 // Shared with the order review modal on purpose: one "how I like to look at images" setting.
@@ -52,6 +64,8 @@ interface BaseTemplateReviewModalProps {
   isOpen: boolean
   onClose: () => void
   entry: QueueEntry
+  // Opened from a thumbnail on the list: show this image in the Product tab first.
+  focusImageUrl?: string | null
   currentIndex: number
   totalCount: number
   onNext: () => void
@@ -76,6 +90,7 @@ export function BaseTemplateReviewModal({
   isOpen,
   onClose,
   entry,
+  focusImageUrl,
   currentIndex,
   totalCount,
   onNext,
@@ -128,11 +143,39 @@ export function BaseTemplateReviewModal({
     enabled: isOpen && !!pt.slug,
   })
 
-  // Product photos from real orders of this variant (fallback: the product type's).
-  const productImages = useMemo(() => {
-    const own = variant.image_links ?? []
-    return own.length > 0 ? own : (pt.image_links ?? [])
-  }, [variant.image_links, pt.image_links])
+  // Everything the Product tab can show, in this order: photos of orders this variant's rule
+  // selects -> photo of each waiting value's sample order -> the product type's own photos.
+  // Deduped by URL; every field is optional (older Mera -> fewer or no images).
+  const gallery = useMemo(() => {
+    const seen = new Set<string>()
+    const out: GalleryImage[] = []
+    const add = (raw: string | undefined, source: GallerySource, label: string) => {
+      const url = raw?.trim()
+      if (!url || seen.has(url)) return
+      seen.add(url)
+      out.push({ url, source, label })
+    }
+    for (const u of variant.image_links ?? []) add(u, "variant", "Đơn khớp variant")
+    for (const pv of variant.pending_values ?? []) {
+      add(pv.image_link, "pending", `Giá trị chờ: ${pv.label || pv.signature || "(không có trường phân biệt)"}`)
+    }
+    for (const u of pt.image_links ?? []) add(u, "pt", "Ảnh product type")
+    return out
+  }, [variant.image_links, variant.pending_values, pt.image_links])
+
+  const safeProductIndex = gallery.length > 0 ? Math.min(productIndex, gallery.length - 1) : 0
+  const currentProductUrl = gallery[safeProductIndex]?.url
+  const ptImages = useMemo(() => gallery.filter((g) => g.source === "pt").map((g) => g.url), [gallery])
+
+  // Show one gallery image large in the viewer (Product tab).
+  const showImage = (url: string | undefined) => {
+    const idx = url ? gallery.findIndex((g) => g.url === url.trim()) : -1
+    if (idx < 0) return
+    setProductIndex(idx)
+    setActiveTab("product")
+  }
+  const showImageRef = useRef(showImage)
+  showImageRef.current = showImage
 
   // ImageViewer is order-shaped: Design / Mockup = the base template, Product = a real photo.
   const order: Order = useMemo(
@@ -142,11 +185,11 @@ export function BaseTemplateReviewModal({
       status: variant.base_template_status,
       designLink: variant.base_template_design,
       mockup: variant.base_template_mockup,
-      productImage: productImages[Math.min(productIndex, Math.max(productImages.length - 1, 0))],
+      productImage: currentProductUrl,
       productType: pt.slug,
       designer: variant.designer,
     }),
-    [pt.slug, variant, productImages, productIndex]
+    [pt.slug, variant, currentProductUrl]
   )
 
   // Fresh viewer state for every variant, like the order modal does per order.
@@ -161,6 +204,11 @@ export function BaseTemplateReviewModal({
     setRotation(0)
     setShowApproved(false)
   }, [entry.key])
+
+  // Declared after the reset above, so on open (same commit) it runs last and wins.
+  useEffect(() => {
+    if (focusImageUrl) showImageRef.current(focusImageUrl)
+  }, [entry.key, focusImageUrl])
 
   useEffect(() => {
     try {
@@ -383,6 +431,9 @@ export function BaseTemplateReviewModal({
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={refreshImages} title="Tải lại ảnh (design / mockup / product)">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen (F)">
               <Maximize className="h-4 w-4" />
             </Button>
@@ -492,9 +543,32 @@ export function BaseTemplateReviewModal({
                   <ul className="space-y-1.5">
                     {pendingValues.map((pv) => (
                       <li key={pv.signature} className="flex items-start justify-between gap-2 text-xs">
-                        <span className="text-purple-950 break-words min-w-0" title={pv.signature || "(chữ ký rỗng)"}>
-                          {pv.label || pv.signature || "(không có trường phân biệt)"}
-                          <span className="text-purple-600"> · {pv.count} đơn</span>
+                        <span className="flex items-start gap-2 min-w-0">
+                          {pv.image_link && (
+                            <button
+                              type="button"
+                              onClick={() => showImage(pv.image_link)}
+                              className={`flex-shrink-0 w-10 h-10 rounded border-2 overflow-hidden bg-white ${
+                                activeTab === "product" && currentProductUrl === pv.image_link.trim()
+                                  ? "border-blue-500"
+                                  : "border-purple-200 hover:border-purple-400"
+                              }`}
+                              title={`Ảnh đơn mẫu ${pv.sample_item_key} — bấm để xem lớn`}
+                            >
+                              <LazyImage
+                                src={pv.image_link}
+                                alt={`Đơn mẫu ${pv.sample_item_key}`}
+                                className="w-full h-full"
+                                fit="cover"
+                                previewSize={200}
+                                fullSize={200}
+                              />
+                            </button>
+                          )}
+                          <span className="text-purple-950 break-words min-w-0" title={pv.signature || "(chữ ký rỗng)"}>
+                            {pv.label || pv.signature || "(không có trường phân biệt)"}
+                            <span className="text-purple-600"> · {pv.count} đơn</span>
+                          </span>
                         </span>
                         {pv.approved ? (
                           <Badge variant="outline" className="flex-shrink-0 text-[10px] px-1.5 py-0 bg-white text-gray-600 border-gray-300">
@@ -636,26 +710,35 @@ export function BaseTemplateReviewModal({
               </div>
             </div>
 
-            {productImages.length > 1 && (
+            {gallery.length > 1 && (
               <div className="flex-shrink-0 border-t border-gray-200 bg-white px-4 py-2">
                 <div className="text-[11px] text-gray-500 mb-1">
-                  Ảnh sản phẩm thật từ đơn ({productImages.length}) — bấm để xem ở tab Product
+                  Ảnh sản phẩm ({gallery.length})
+                  {activeTab === "product" && gallery[safeProductIndex] && (
+                    <span className="text-gray-700"> · đang xem: {gallery[safeProductIndex].label}</span>
+                  )}{" "}
+                  — bấm để xem ở tab Product
                 </div>
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {productImages.map((url, i) => (
+                  {gallery.map((img, i) => (
                     <button
-                      key={`${url}-${i}`}
+                      key={img.url}
                       type="button"
                       onClick={() => {
                         setProductIndex(i)
                         setActiveTab("product")
                       }}
-                      className={`flex-shrink-0 w-14 h-14 rounded border-2 overflow-hidden bg-white ${
-                        activeTab === "product" && i === productIndex ? "border-blue-500" : "border-gray-200"
+                      className={`relative flex-shrink-0 w-14 h-14 rounded border-2 overflow-hidden bg-white ${
+                        activeTab === "product" && i === safeProductIndex ? "border-blue-500" : "border-gray-200"
                       }`}
-                      title={url}
+                      title={img.label}
                     >
-                      <LazyImage src={url} alt={`Product ${i + 1}`} className="w-full h-full" fit="cover" previewSize={400} fullSize={400} />
+                      <LazyImage src={img.url} alt={img.label} className="w-full h-full" fit="cover" previewSize={400} fullSize={400} />
+                      {SOURCE_BADGE[img.source] && (
+                        <span className="absolute top-0 left-0 bg-black/70 text-white text-[9px] leading-none px-1 py-0.5 rounded-br">
+                          {SOURCE_BADGE[img.source]}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -683,6 +766,9 @@ export function BaseTemplateReviewModal({
               productTypeNoteError={productTypeNoteError}
               refetchProductTypeNote={refetchProductTypeNote}
               getCachedImageUrl={getCachedImageUrl}
+              productTypeImages={ptImages}
+              activeImageUrl={activeTab === "product" ? currentProductUrl : undefined}
+              onShowImage={showImage}
             />
           </div>
         </div>

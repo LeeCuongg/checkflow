@@ -23,9 +23,11 @@ export type BaseTemplateActionOutcome =
 interface Options {
   projectId: string // "" = all projects
   search: string
+  // false = hold off loading (e.g. until the saved project filter has been read back).
+  enabled?: boolean
 }
 
-export function useMeraBaseTemplates({ projectId, search }: Options) {
+export function useMeraBaseTemplates({ projectId, search, enabled = true }: Options) {
   const { user, getToken, signOut } = useAuth()
   const [queue, setQueue] = useState<BaseTemplateProductType[]>([])
   const [queueTotal, setQueueTotal] = useState(0)
@@ -72,7 +74,7 @@ export function useMeraBaseTemplates({ projectId, search }: Options) {
 
   const refetch = useCallback(
     async (opts?: { nocache?: boolean }) => {
-      if (!user) return
+      if (!user || !enabled) return
       const seq = ++requestSeq.current
       const nc: Record<string, string> = opts?.nocache ? { nocache: "true" } : {}
       setLoading(true)
@@ -118,7 +120,7 @@ export function useMeraBaseTemplates({ projectId, search }: Options) {
         if (seq === requestSeq.current) setLoading(false)
       }
     },
-    [user, call, listUrl]
+    [user, enabled, call, listUrl]
   )
 
   useEffect(() => {

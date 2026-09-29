@@ -33,6 +33,8 @@ export interface BaseTemplatePendingValue {
   count: number // waiting orders carrying this signature
   approved: boolean // already in approved_signatures (leftover orders from while the switch was OFF)
   sample_item_key: string
+  // Photo (image_link, fallback image) of sample_item_key. omitempty — absent on older backends.
+  image_link?: string
 }
 
 export interface BaseTemplateVariant {
@@ -48,7 +50,9 @@ export interface BaseTemplateVariant {
   designer: string
   pending_count: number
   pending_item_key: string
-  image_links?: string[] // product photos from real orders of this variant
+  // Product photos of orders that this variant's rule SELECTS (as on Mera's Production SKU
+  // screen; fallback: orders on the same design_link). Up to 4, deduped. omitempty.
+  image_links?: string[]
   history?: BaseTemplateHistoryEntry[]
   approved_signatures?: string[]
   // New (checkflow contract). Not omitempty on the new backend; optional here only so an
@@ -72,7 +76,7 @@ export interface BaseTemplateProductType {
   display_name: string
   version: number
   pt_status: string
-  image_links?: string[]
+  image_links?: string[] // the product type's own photos (designer-side), up to 8. omitempty.
   variants: BaseTemplateVariant[]
   signature_supported?: boolean
   signature_config?: BaseTemplateSignatureConfig
