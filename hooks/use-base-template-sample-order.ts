@@ -27,13 +27,19 @@ export const sampleItemKeyOf = (v: BaseTemplateVariant): string =>
 // Mera treats `q` as a regular expression.
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
+// A variant with nothing waiting has no sample_item_key. Store / listing live on the orders
+// of the product type, so fall back to any order of it — the one using this variant's design
+// link first — found by an anchored product_type match.
 export function useBaseTemplateSampleOrder(
   cacheKey: string | null,
   projectId: string,
-  sampleItemKey: string
+  sampleItemKey: string,
+  productType = "",
+  designLink = ""
 ): SampleOrderState {
   const { user, getToken } = useAuth()
-  const fullKey = cacheKey ? `${cacheKey}|${sampleItemKey}` : ""
+  const lookup = sampleItemKey || productType
+  const fullKey = cacheKey && lookup ? `${cacheKey}|${sampleItemKey || `pt:${productType}`}` : ""
   const [state, setState] = useState<{ key: string; order: Order | null; loading: boolean; error: string | null }>({
     key: "",
     order: null,
@@ -42,7 +48,7 @@ export function useBaseTemplateSampleOrder(
   })
 
   useEffect(() => {
-    if (!fullKey || !sampleItemKey || !projectId || !user) return
+    if (!fullKey || !lookup || !projectId || !user) return
     if (cache.has(fullKey)) {
       setState({ key: fullKey, order: cache.get(fullKey) ?? null, loading: false, error: null })
       return
@@ -56,9 +62,9 @@ export function useBaseTemplateSampleOrder(
       if (!token) throw new Error("Not authenticated")
       const sp = new URLSearchParams({
         project_id: projectId,
-        q: escapeRegex(sampleItemKey),
+        q: sampleItemKey ? escapeRegex(sampleItemKey) : `^${escapeRegex(productType)}$`,
         include_items: "true",
-        page_size: "5",
+        page_size: sampleItemKey ? "5" : "20",
       })
       const res = await fetch(`/api/mera/orders?${sp.toString()}`, {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -68,11 +74,25 @@ export function useBaseTemplateSampleOrder(
         throw new Error(body.error || `HTTP ${res.status}`)
       }
       const data = (await res.json()) as MeraListOrdersResponse
-      for (const order of data.orders ?? []) {
-        const item = order.items?.find((it) => it.item_key === sampleItemKey)
-        if (item) return adaptMeraOrderWithItem(order, item)
+      const orders = data.orders ?? []
+      if (sampleItemKey) {
+        for (const order of orders) {
+          const item = order.items?.find((it) => it.item_key === sampleItemKey)
+          if (item) return adaptMeraOrderWithItem(order, item)
+        }
+        return null
       }
-      return null
+      // Fallback: an item of this product type, preferring one on this variant's design link.
+      const link = designLink.trim()
+      let firstOfType: ReturnType<typeof adaptMeraOrderWithItem> | null = null
+      for (const order of orders) {
+        for (const item of order.items ?? []) {
+          if (item.product_type !== productType) continue
+          if (link && (item.design_link || "").trim() === link) return adaptMeraOrderWithItem(order, item)
+          if (!firstOfType) firstOfType = adaptMeraOrderWithItem(order, item)
+        }
+      }
+      return firstOfType
     }
 
     run()
@@ -88,7 +108,7 @@ export function useBaseTemplateSampleOrder(
     return () => {
       cancelled = true
     }
-  }, [fullKey, sampleItemKey, projectId, user, getToken])
+  }, [fullKey, lookup, sampleItemKey, productType, designLink, projectId, user, getToken])
 
   if (state.key === fullKey && fullKey) {
     return { sampleItemKey, order: state.order, loading: state.loading, error: state.error }
@@ -97,5 +117,5 @@ export function useBaseTemplateSampleOrder(
   if (fullKey && cache.has(fullKey)) {
     return { sampleItemKey, order: cache.get(fullKey) ?? null, loading: false, error: null }
   }
-  return { sampleItemKey, order: null, loading: !!(fullKey && sampleItemKey && projectId && user), error: null }
+  return { sampleItemKey, order: null, loading: !!(fullKey && projectId && user), error: null }
 }
