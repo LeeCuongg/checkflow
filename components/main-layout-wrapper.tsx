@@ -24,6 +24,8 @@ const getPageTitle = (pathname: string) => {
       return "Changelog"
     case "/checker":
       return "Checker"
+    case "/base-templates":
+      return "Base Templates"
     default:
       return "CheckFlow"
   }
