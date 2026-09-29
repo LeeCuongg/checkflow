@@ -72,6 +72,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
   // match this variant.
   const ptImage = (pt.image_links ?? []).find(Boolean)
   const productImage = (variant.image_links ?? []).find(Boolean)
+  const matchedImages = (variant.image_links ?? []).filter(Boolean).slice(0, 4)
 
   const stop = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -151,14 +152,30 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Left: variant details */}
           <div className="lg:col-span-2 space-y-3">
-            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm font-semibold text-blue-900">Điều kiện khớp</span>
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100 flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-semibold text-blue-900">Điều kiện khớp</span>
+                </div>
+                <p className="text-sm text-blue-800 leading-relaxed line-clamp-2" title={conditionSummary(variant)}>
+                  {conditionSummary(variant)}
+                </p>
               </div>
-              <p className="text-sm text-blue-800 leading-relaxed line-clamp-2" title={conditionSummary(variant)}>
-                {conditionSummary(variant)}
-              </p>
+              {/* Photos of real orders that match these conditions — what this variant looks like. */}
+              {matchedImages.length > 0 && (
+                <div className="flex gap-1.5 flex-shrink-0">
+                  {matchedImages.map((url, i) => (
+                    <Thumb
+                      key={url}
+                      url={url}
+                      label={`Ảnh đơn khớp điều kiện ${i + 1}`}
+                      className="w-14 h-14"
+                      onOpen={onOpen}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {pendingValues.length > 0 && (
