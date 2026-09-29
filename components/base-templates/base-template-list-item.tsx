@@ -216,12 +216,10 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Package className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <span className="font-medium text-gray-700">Product type:</span>
-                  <span className="text-gray-600 truncate" title={pt.slug}>
-                    {pt.slug}
-                  </span>
+                <div className="flex items-start gap-2 min-w-0" style={{ gridColumn: "1 / -1" }}>
+                  <Package className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Product type:</span>
+                  <span className="text-gray-600 break-all">{pt.slug}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-gray-400" />
