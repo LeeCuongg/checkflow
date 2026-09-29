@@ -22,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, ChevronDown, Zap, FileText, Eye, AlertTriangle, ScrollText, CheckCircle, type LucideIcon } from "lucide-react" // Added CheckCircle icon
+import { LogOut, ChevronDown, Zap, FileText, Eye, AlertTriangle, ScrollText, CheckCircle, LayoutTemplate, type LucideIcon } from "lucide-react" // Added CheckCircle icon
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, usePathname } from "next/navigation"
@@ -53,6 +53,11 @@ const navigationItems: Array<{
     title: "Checker",
     url: "/checker",
     icon: CheckCircle,
+  },
+  {
+    title: "Base Templates",
+    url: "/base-templates",
+    icon: LayoutTemplate,
   },
   {
     title: "Changelog",

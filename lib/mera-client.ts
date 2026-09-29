@@ -11,6 +11,14 @@ import type {
   MeraPatchOrderBody,
   MeraProject,
 } from "@/types/mera-order"
+import type {
+  BaseTemplateActionResult,
+  BaseTemplateConfirmBody,
+  BaseTemplateListParams,
+  BaseTemplateListResponse,
+  BaseTemplateNeedRepairBody,
+  BaseTemplateSettings,
+} from "@/types/mera-base-template"
 
 function buildMeraApiError(message: string, status: number, detail?: unknown): Error & { status: number; detail?: unknown } {
   const err = new Error(message) as Error & { status: number; detail?: unknown }
@@ -144,6 +152,49 @@ class MeraClient {
       `/api/v2/orders/${encodeURIComponent(orderId)}/items/bulk`,
       { actor, body }
     )
+  }
+
+  // ── Base template review (checkflow /base-templates) ──
+
+  async listBaseTemplates(actor: MeraActor, params: BaseTemplateListParams): Promise<BaseTemplateListResponse> {
+    const queryParams: Record<string, string> = {}
+    if (params.project_id) queryParams.project_id = params.project_id
+    if (params.status) queryParams.status = params.status
+    if (params.pending) queryParams.pending = "true"
+    if (params.queue) queryParams.queue = "true"
+    if (params.nocache) queryParams.nocache = "true"
+    if (params.search) queryParams.search = params.search
+    if (params.page) queryParams.page = String(params.page)
+    if (params.limit) queryParams.limit = String(params.limit)
+    return this.request<BaseTemplateListResponse>("GET", "/api/v1/base-templates", { actor, params: queryParams })
+  }
+
+  async confirmBaseTemplate(
+    actor: MeraActor,
+    projectId: string,
+    body: BaseTemplateConfirmBody
+  ): Promise<BaseTemplateActionResult> {
+    return this.request<BaseTemplateActionResult>(
+      "POST",
+      `/api/v1/projects/${encodeURIComponent(projectId)}/base-template/confirm`,
+      { actor, body }
+    )
+  }
+
+  async needRepairBaseTemplate(
+    actor: MeraActor,
+    projectId: string,
+    body: BaseTemplateNeedRepairBody
+  ): Promise<BaseTemplateActionResult> {
+    return this.request<BaseTemplateActionResult>(
+      "POST",
+      `/api/v1/projects/${encodeURIComponent(projectId)}/base-template/need-repair`,
+      { actor, body }
+    )
+  }
+
+  async getBaseTemplateSettings(actor: MeraActor): Promise<BaseTemplateSettings> {
+    return this.request<BaseTemplateSettings>("GET", "/api/v1/base-template-settings", { actor })
   }
 }
 
