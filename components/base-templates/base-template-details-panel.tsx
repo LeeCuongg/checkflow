@@ -264,6 +264,10 @@ export function BaseTemplateDetailsPanel({
         productTypeNoteError={productTypeNoteError}
         refetchProductTypeNote={refetchProductTypeNote}
         getCachedImageUrl={getCachedImageUrl}
+        // Empty note → show the product photos instead: the product type's own, else the
+        // photos of orders matching this variant.
+        emptyImages={(productTypeImages.length > 0 ? productTypeImages : (variant.image_links ?? []).filter(Boolean)).slice(0, 6)}
+        onEmptyImageClick={onShowImage}
       />
 
       {/* Base Template History */}

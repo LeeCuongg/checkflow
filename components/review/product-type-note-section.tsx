@@ -17,6 +17,10 @@ interface ProductTypeNoteSectionProps {
   productTypeNoteError: string | null
   refetchProductTypeNote: () => void
   getCachedImageUrl: (url: string | null | undefined) => string | null
+  // Shown in place of the "no notes" text when the note is empty (e.g. the product photos on
+  // the base template screen). Omitted = the plain empty text, as before.
+  emptyImages?: string[]
+  onEmptyImageClick?: (url: string) => void
 }
 
 // "Note for <product type>" block — view / edit / save the shared per-product-type note
@@ -29,6 +33,8 @@ export function ProductTypeNoteSection({
   productTypeNoteError,
   refetchProductTypeNote,
   getCachedImageUrl,
+  emptyImages,
+  onEmptyImageClick,
 }: ProductTypeNoteSectionProps) {
   const [productTypeNote, setProductTypeNote] = useState("")
   const [isEditingProductNote, setIsEditingProductNote] = useState(false)
@@ -214,6 +220,23 @@ export function ProductTypeNoteSection({
           <div className="min-h-[60px] bg-orange-50 rounded-md p-3 border border-orange-100">
             {productTypeNote ? (
               renderNoteContent(productTypeNote)
+            ) : emptyImages && emptyImages.length > 0 ? (
+              <div className="space-y-2">
+                <div className="text-xs text-gray-500 italic">Chưa có note — ảnh sản phẩm (bấm Edit để thêm note):</div>
+                <div className="gap-2" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+                  {emptyImages.map((url) => (
+                    <LazyImage
+                      key={url}
+                      src={getCachedImageUrl(url) || url}
+                      alt="Product"
+                      className="w-full h-24 rounded border border-orange-200 cursor-pointer"
+                      fit="cover"
+                      onClick={() => (onEmptyImageClick ? onEmptyImageClick(url) : window.open(url, "_blank"))}
+                      fallbackSrc="/placeholder.svg?height=96&width=96&text=Product"
+                    />
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="text-xs text-gray-500 italic">
                 No notes available for this product type. Click Edit to add notes.
