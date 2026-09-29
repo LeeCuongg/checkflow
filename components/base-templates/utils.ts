@@ -64,27 +64,7 @@ export function conditionSummary(v: BaseTemplateVariant): string {
 export const countriesLabel = (v: BaseTemplateVariant) =>
   v.countries && v.countries.length > 0 ? v.countries.join(", ") : "Mọi nước"
 
-export function statusBadgeClass(status: string): string {
-  switch (status) {
-    case "CONFIRMED":
-      return "bg-green-100 text-green-800 border-green-200"
-    case "REPAIRED":
-      return "bg-purple-100 text-purple-800 border-purple-200"
-    case "NEED REPAIR":
-      return "bg-red-100 text-red-800 border-red-200"
-    default:
-      return "bg-gray-100 text-gray-700 border-gray-200"
-  }
-}
-
 export const statusLabel = (status: string) => status || "Chưa duyệt"
-
-export function formatDateTime(iso?: string): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString("vi-VN", { hour12: false })
-}
 
 // Keyboard shortcuts must not fire while the checker is typing.
 export function isTypingTarget(target: EventTarget | null): boolean {

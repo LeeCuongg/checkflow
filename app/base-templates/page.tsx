@@ -1,21 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, RefreshCw, Search, Wrench } from "lucide-react"
+import { AlertTriangle, Loader2, Play, RefreshCw, Search, Stamp } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import { useMeraProjects } from "@/hooks/use-mera-projects"
 import { useMeraBaseTemplates, type BaseTemplateActionOutcome } from "@/hooks/use-mera-base-templates"
 import { MeraProjectSelector } from "@/components/review/mera-project-selector"
-import { QueueList } from "@/components/base-templates/queue-list"
-import { TemplateViewer } from "@/components/base-templates/template-viewer"
-import { VariantDetails } from "@/components/base-templates/variant-details"
+import { BaseTemplateListItem } from "@/components/base-templates/base-template-list-item"
+import { BaseTemplateReviewModal } from "@/components/base-templates/base-template-review-modal"
 import { NeedRepairDialog } from "@/components/base-templates/need-repair-dialog"
 import {
   type QueueEntry,
-  conditionSummary,
   flattenEntries,
   isTypingTarget,
   needsReview,
@@ -45,7 +45,7 @@ function conflictOrError(outcome: Extract<BaseTemplateActionOutcome, { ok: false
 
 export default function BaseTemplatesPage() {
   const [projectId, setProjectId] = useState("")
-  const [showProjects, setShowProjects] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
   const [tab, setTab] = useState<QueueTab>("queue")
@@ -53,6 +53,7 @@ export default function BaseTemplatesPage() {
   const [repairOpen, setRepairOpen] = useState(false)
   const [busy, setBusy] = useState<"confirm" | "repair" | null>(null)
   const lastIndexRef = useRef(0)
+  const rowRefs = useRef(new Map<string, HTMLDivElement>())
 
   const { projects, loading: projectsLoading, error: projectsError } = useMeraProjects()
   const bt = useMeraBaseTemplates({ projectId, search })
@@ -92,17 +93,34 @@ export default function BaseTemplatesPage() {
   const canConfirm = canAct && selectedStatus !== "NEED REPAIR"
   const autoStatusOff = bt.settings?.auto_status_enabled === false
 
-  const selectIndex = useCallback(
-    (i: number) => {
-      if (entries.length === 0) return
-      const clamped = (i + entries.length) % entries.length
-      setSelectedKey(entries[clamped].key)
+  // Like the order review modal: Space / Shift+Space stop at both ends (no wrap-around).
+  const goNext = useCallback(() => {
+    if (selectedIndex >= 0 && selectedIndex < entries.length - 1) setSelectedKey(entries[selectedIndex + 1].key)
+  }, [entries, selectedIndex])
+  const goPrev = useCallback(() => {
+    if (selectedIndex > 0) setSelectedKey(entries[selectedIndex - 1].key)
+  }, [entries, selectedIndex])
+
+  const openReview = useCallback(
+    (key?: string) => {
+      const target = key ?? selectedKey ?? entries[0]?.key
+      if (!target) return
+      setSelectedKey(target)
+      setReviewOpen(true)
     },
-    [entries]
+    [selectedKey, entries]
   )
 
-  const goNext = useCallback(() => selectIndex(selectedIndex + 1), [selectIndex, selectedIndex])
-  const goPrev = useCallback(() => selectIndex(selectedIndex - 1), [selectIndex, selectedIndex])
+  // Nothing left to review (all done, filtered out, tab switched) → back to the list.
+  useEffect(() => {
+    if (reviewOpen && entries.length === 0 && !bt.loading) setReviewOpen(false)
+  }, [reviewOpen, entries.length, bt.loading])
+
+  // Keep the row of the variant being reviewed in view, so closing the modal lands there.
+  // (Only while reviewing: on first load the page must stay at the top.)
+  useEffect(() => {
+    if (reviewOpen && selectedKey) rowRefs.current.get(selectedKey)?.scrollIntoView({ block: "nearest" })
+  }, [selectedKey, reviewOpen])
 
   // After an action: move to the next variant right away, then reload bypassing Mera's
   // 60s list cache. If the next one vanished meanwhile, the selection effect falls back
@@ -225,211 +243,219 @@ export default function BaseTemplatesPage() {
     [selected, canAct, bt, advanceAndRefetch]
   )
 
-  // Shortcuts: 1 = CONFIRMED, 2 = NEED REPAIR, Space / Shift+Space = next / previous.
-  // Esc is handled by the dialog itself. Deliberately NOT gated on NODE_ENV.
+  // List shortcuts (the modal owns its own while open): Enter opens the review on the
+  // selected variant. Deliberately NOT gated on NODE_ENV.
   useEffect(() => {
+    if (reviewOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (repairOpen) return
-      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
-      switch (e.key) {
-        case "1":
-          e.preventDefault()
-          if (canConfirm) void handleConfirm()
-          else if (selectedStatus === "NEED REPAIR" && tab === "queue") {
-            toast({ title: "Template đang NEED REPAIR — không duyệt được", variant: "destructive" })
-          }
-          break
-        case "2":
-          e.preventDefault()
-          if (canAct) setRepairOpen(true)
-          break
-        case " ":
-          e.preventDefault()
-          if (busy) return
-          if (e.shiftKey) goPrev()
-          else goNext()
-          break
-      }
+      if (e.key !== "Enter" || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
+      // A focused row / button handles its own Enter.
+      if (e.target instanceof HTMLElement && e.target.closest("button, a, [role='button']")) return
+      e.preventDefault()
+      openReview()
     }
     document.addEventListener("keydown", onKeyDown)
     return () => document.removeEventListener("keydown", onKeyDown)
-  }, [repairOpen, canConfirm, canAct, busy, selectedStatus, tab, handleConfirm, goNext, goPrev])
+  }, [reviewOpen, openReview])
 
-  const selectedProjectName = projectId ? (projects.find((p) => p.id === projectId)?.name ?? projectId) : "All projects"
   const loadedPtCount = tab === "queue" ? bt.queue.length : bt.repair.length
   const reportedPtTotal = tab === "queue" ? bt.queueTotal : bt.repairTotal
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-y-auto p-3 gap-3">
-      {/* ── Top bar ── */}
-      <div className="flex-shrink-0 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowProjects((s) => !s)} className="bg-white">
-            Project: <span className="font-semibold ml-1">{selectedProjectName}</span>
-            {showProjects ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
-          </Button>
-          <div className="relative w-72">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") (e.target as HTMLInputElement).blur()
-              }}
-              placeholder="Tìm product type..."
-              className="pl-8 h-9 bg-white"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white"
-            onClick={() => bt.refetch({ nocache: true })}
-            disabled={bt.loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-1 ${bt.loading ? "animate-spin" : ""}`} />
-            Tải lại
-          </Button>
-          <div className="ml-auto text-xs text-gray-500 hidden lg:block">
-            Phím: <kbd className="px-1 border rounded bg-white">1</kbd> CONFIRMED ·{" "}
-            <kbd className="px-1 border rounded bg-white">2</kbd> NEED REPAIR ·{" "}
-            <kbd className="px-1 border rounded bg-white">Space</kbd>/<kbd className="px-1 border rounded bg-white">Shift+Space</kbd>{" "}
-            kế/trước · <kbd className="px-1 border rounded bg-white">D</kbd>/<kbd className="px-1 border rounded bg-white">M</kbd>/
-            <kbd className="px-1 border rounded bg-white">P</kbd> tab · <kbd className="px-1 border rounded bg-white">R</kbd> xoay
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Base Template Review</h1>
+              <p className="text-gray-600 mt-2">Duyệt base template của Mera — mỗi dòng là một variant cần kiểm tra</p>
+            </div>
+            {bt.settings && (
+              <Badge
+                variant="outline"
+                className={
+                  autoStatusOff
+                    ? "bg-amber-50 text-amber-800 border-amber-300 text-sm px-3 py-1"
+                    : "bg-green-50 text-green-800 border-green-300 text-sm px-3 py-1"
+                }
+              >
+                Công tắc {autoStatusOff ? "TẮT" : "BẬT"}
+              </Badge>
+            )}
           </div>
         </div>
 
-        {showProjects && (
-          <MeraProjectSelector
-            projects={projects}
-            projectsLoading={projectsLoading}
-            selectedProjectId={projectId}
-            onProjectSelect={(id) => {
-              setProjectId(id)
-              setShowProjects(false)
+        <MeraProjectSelector
+          projects={projects}
+          projectsLoading={projectsLoading}
+          selectedProjectId={projectId}
+          onProjectSelect={setProjectId}
+          ordersLoading={bt.loading}
+          error={projectsError}
+        />
+
+        <Card className="border-gray-200 shadow-sm">
+          <div className="p-6 space-y-4">
+            {/* Header Row */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold text-gray-900">Base Templates</h2>
+                <span className="text-sm text-gray-600">
+                  {entries.length.toLocaleString()} variant{tab === "queue" ? " cần duyệt" : " chờ designer sửa"}
+                </span>
+                {search.trim() && (
+                  <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200">
+                    tìm: {search.trim()}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => bt.refetch({ nocache: true })}
+                  disabled={bt.loading}
+                  className="flex items-center gap-2 bg-transparent border-gray-300"
+                >
+                  <RefreshCw className={`h-4 w-4 ${bt.loading ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+                {entries.length > 0 && (
+                  <Button onClick={() => openReview()} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Review
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Search + tabs */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex-1 min-w-[240px] relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") (e.target as HTMLInputElement).blur()
+                  }}
+                  placeholder="Tìm product type..."
+                  className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <Tabs value={tab} onValueChange={(v) => setTab(v as QueueTab)}>
+                <TabsList>
+                  <TabsTrigger value="queue">Hàng đợi ({queueEntries.length})</TabsTrigger>
+                  <TabsTrigger value="repair">Chờ designer sửa ({repairEntries.length})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {bt.settings && autoStatusOff && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  <b>Công tắc đang TẮT</b> — duyệt chỉ đổi trạng thái template (và ghi nhận giá trị), đơn giữ DESIGNED.
+                  NEED REPAIR vẫn thu hồi đơn.
+                </span>
+              </div>
+            )}
+            {bt.settings && !autoStatusOff && (
+              <div className="rounded-md border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-800">
+                Công tắc BẬT — CONFIRMED sẽ tự chuyển các đơn chờ mang giá trị đang hiển thị sang CONFIRMED.
+              </div>
+            )}
+            {!bt.settings && bt.settingsError && (
+              <div className="rounded-md border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs text-gray-700">
+                Không đọc được trạng thái công tắc ({bt.settingsError}).
+              </div>
+            )}
+            {bt.error && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{bt.error}</div>
+            )}
+            {reportedPtTotal > loadedPtCount && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
+                Đang hiện {loadedPtCount}/{reportedPtTotal} product type — lọc theo project hoặc tìm để thu hẹp.
+              </div>
+            )}
+            {tab === "repair" && (
+              <div className="text-xs text-gray-500">
+                Chỉ xem — các template này đang chờ designer sửa; khi designer bấm “Đã sửa xong”, chúng quay lại hàng
+                đợi (REPAIRED).
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* List */}
+        {bt.loading && entries.length === 0 ? (
+          <Card className="border-gray-200 shadow-sm">
+            <div className="p-12 flex items-center justify-center text-gray-600">
+              <Loader2 className="h-6 w-6 animate-spin mr-3 text-blue-600" />
+              Đang tải base template...
+            </div>
+          </Card>
+        ) : entries.length === 0 ? (
+          <Card className="border-gray-200 shadow-sm">
+            <div className="p-12 flex flex-col items-center justify-center space-y-4">
+              <Stamp className="h-12 w-12 text-gray-400" />
+              <div className="text-center">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {tab === "queue" ? "Không có base template nào cần duyệt." : "Không có template nào chờ designer sửa."}
+                </h3>
+                {search.trim() && <p className="text-sm text-gray-500 mt-2">Thử bỏ bớt từ khoá tìm kiếm.</p>}
+              </div>
+            </div>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {entries.map((entry) => (
+              <BaseTemplateListItem
+                key={entry.key}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(entry.key, el)
+                  else rowRefs.current.delete(entry.key)
+                }}
+                entry={entry}
+                selected={entry.key === selectedKey}
+                showProject={!projectId}
+                onOpen={() => openReview(entry.key)}
+              />
+            ))}
+          </div>
+        )}
+
+        {reviewOpen && selected && (
+          <BaseTemplateReviewModal
+            isOpen={reviewOpen}
+            onClose={() => setReviewOpen(false)}
+            entry={selected}
+            currentIndex={selectedIndex}
+            totalCount={entries.length}
+            onNext={goNext}
+            onPrevious={goPrev}
+            readOnly={tab === "repair"}
+            busy={busy}
+            canConfirm={canConfirm}
+            canAct={canAct}
+            autoStatusOff={bt.settings ? autoStatusOff : null}
+            onConfirm={() => void handleConfirm()}
+            onRequestNeedRepair={() => {
+              if (canAct) setRepairOpen(true)
             }}
-            ordersLoading={false}
-            error={projectsError}
+            shortcutsPaused={repairOpen}
           />
         )}
 
-        {bt.settings && autoStatusOff && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span>
-              <b>Công tắc đang TẮT</b> — duyệt chỉ đổi trạng thái template (và ghi nhận giá trị), đơn giữ DESIGNED.
-              NEED REPAIR vẫn thu hồi đơn.
-            </span>
-          </div>
-        )}
-        {bt.settings && !autoStatusOff && (
-          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-800">
-            Công tắc BẬT — CONFIRMED sẽ tự chuyển các đơn chờ mang giá trị đang hiển thị sang CONFIRMED.
-          </div>
-        )}
-        {!bt.settings && bt.settingsError && (
-          <div className="rounded-md border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs text-gray-700">
-            Không đọc được trạng thái công tắc ({bt.settingsError}).
-          </div>
-        )}
-        {bt.error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{bt.error}</div>
-        )}
-        {reportedPtTotal > loadedPtCount && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
-            Đang hiện {loadedPtCount}/{reportedPtTotal} product type — lọc theo project hoặc tìm để thu hẹp.
-          </div>
-        )}
+        <NeedRepairDialog
+          open={repairOpen}
+          onOpenChange={setRepairOpen}
+          templateLabel={selected ? selected.pt.display_name || selected.pt.slug : ""}
+          pendingCount={selected?.variant.pending_count ?? 0}
+          submitting={busy === "repair"}
+          onSubmit={(note) => void handleNeedRepair(note)}
+        />
       </div>
-
-      {/* ── Main: queue | viewer | details ── */}
-      <div className="flex-1 min-h-[560px] grid grid-cols-[300px_minmax(0,1fr)_360px] gap-3">
-        <div className="flex flex-col min-h-0 rounded-lg border bg-white">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as QueueTab)} className="flex-shrink-0 p-2 border-b">
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="queue">Hàng đợi ({queueEntries.length})</TabsTrigger>
-              <TabsTrigger value="repair">Chờ designer sửa ({repairEntries.length})</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {bt.loading && entries.length === 0 ? (
-              <div className="flex items-center justify-center py-10 text-sm text-gray-500">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Đang tải...
-              </div>
-            ) : (
-              <QueueList
-                entries={entries}
-                selectedKey={selectedKey}
-                onSelect={setSelectedKey}
-                showProject={!projectId}
-                emptyText={tab === "queue" ? "Không có base template nào cần duyệt." : "Không có template nào chờ designer sửa."}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="min-h-0 rounded-lg border bg-white p-2">
-          {selected ? (
-            <TemplateViewer
-              key={selected.key}
-              pt={selected.pt}
-              variant={selected.variant}
-              shortcutsEnabled={!repairOpen}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center text-sm text-gray-500">Chọn một variant ở hàng đợi.</div>
-          )}
-        </div>
-
-        <div className="flex flex-col min-h-0 rounded-lg border bg-white">
-          <div className="flex-1 min-h-0 overflow-y-auto p-3">
-            {selected ? (
-              <VariantDetails pt={selected.pt} variant={selected.variant} />
-            ) : (
-              <div className="text-sm text-gray-500">—</div>
-            )}
-          </div>
-          <div className="flex-shrink-0 border-t p-3 space-y-2">
-            {tab === "repair" ? (
-              <div className="text-xs text-gray-600">
-                Chỉ xem — template đang chờ designer sửa. Khi designer bấm “Đã sửa xong”, nó quay lại hàng đợi (REPAIRED).
-              </div>
-            ) : (
-              <>
-                {selected && (
-                  <div className="text-[11px] text-gray-500">
-                    {selectedIndex + 1}/{entries.length} · {conditionSummary(selected.variant)}
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => void handleConfirm()}
-                    disabled={!canConfirm}
-                    title={selectedStatus === "NEED REPAIR" ? "Template đang NEED REPAIR" : "Phím 1"}
-                  >
-                    {busy === "confirm" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
-                    CONFIRMED (1)
-                  </Button>
-                  <Button variant="destructive" onClick={() => setRepairOpen(true)} disabled={!canAct} title="Phím 2">
-                    {busy === "repair" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Wrench className="h-4 w-4 mr-1" />}
-                    NEED REPAIR (2)
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <NeedRepairDialog
-        open={repairOpen}
-        onOpenChange={setRepairOpen}
-        templateLabel={selected ? selected.pt.display_name || selected.pt.slug : ""}
-        pendingCount={selected?.variant.pending_count ?? 0}
-        submitting={busy === "repair"}
-        onSubmit={(note) => void handleNeedRepair(note)}
-      />
     </div>
   )
 }

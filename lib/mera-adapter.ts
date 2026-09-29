@@ -16,7 +16,7 @@ function mapStatus(meraStatus: string): Order["status"] {
   return STATUS_MAP[meraStatus] ?? (meraStatus as Order["status"])
 }
 
-function adaptMeraOrderWithItem(order: MeraOrder, item: MeraOrderItem): Order & { _mera: MeraOrder } {
+export function adaptMeraOrderWithItem(order: MeraOrder, item: MeraOrderItem): Order & { _mera: MeraOrder } {
   return {
     itemId: item.item_key,
     sheetId: "__mera__",

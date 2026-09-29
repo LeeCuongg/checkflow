@@ -1,4 +1,28 @@
-export function KeyboardShortcuts() {
+interface ShortcutAction {
+  label: string
+  keyLabel: string
+}
+
+interface KeyboardShortcutsProps {
+  // Rows of the "Primary Actions" group. Default: Confirm (1).
+  primaryActions?: ShortcutAction[]
+  // Noun in "Next …" / "Previous …". Default: "Order".
+  itemNoun?: string
+  // Rows that only exist on the order review modal. Default: shown.
+  showCopyItemId?: boolean
+  showCustomerTab?: boolean
+  showOtherActions?: boolean
+}
+
+const DEFAULT_PRIMARY_ACTIONS: ShortcutAction[] = [{ label: "Confirm", keyLabel: "1" }]
+
+export function KeyboardShortcuts({
+  primaryActions = DEFAULT_PRIMARY_ACTIONS,
+  itemNoun = "Order",
+  showCopyItemId = true,
+  showCustomerTab = true,
+  showOtherActions = true,
+}: KeyboardShortcutsProps = {}) {
   return (
     <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg p-3 border border-slate-200 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
@@ -9,23 +33,27 @@ export function KeyboardShortcuts() {
       <div className="space-y-2">
         {/* Primary Actions */}
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-600">Confirm</span>
-            <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">1</kbd>
-          </div>
+          {primaryActions.map((action) => (
+            <div key={action.label} className="flex items-center justify-between">
+              <span className="text-xs text-slate-600">{action.label}</span>
+              <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">
+                {action.keyLabel}
+              </kbd>
+            </div>
+          ))}
         </div>
 
         <div className="border-t border-slate-200 pt-2">
           {/* Navigation */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-600">Next Order</span>
+              <span className="text-xs text-slate-600">Next {itemNoun}</span>
               <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">
                 Space
               </kbd>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-600">Previous Order</span>
+              <span className="text-xs text-slate-600">Previous {itemNoun}</span>
               <div className="flex gap-1">
                 <kbd className="px-1.5 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">
                   Shift
@@ -54,10 +82,12 @@ export function KeyboardShortcuts() {
               <span className="text-xs text-slate-600">Copy Screenshot</span>
               <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">S</kbd>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-600">Copy Item ID</span>
-              <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">A</kbd>
-            </div>
+            {showCopyItemId && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-600">Copy Item ID</span>
+                <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">A</kbd>
+              </div>
+            )}
           </div>
         </div>
 
@@ -83,28 +113,32 @@ export function KeyboardShortcuts() {
                 P
               </kbd>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-600">Customer</span>
-              <kbd className="px-1.5 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">
-                I
-              </kbd>
-            </div>
+            {showCustomerTab && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Customer</span>
+                <kbd className="px-1.5 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">
+                  I
+                </kbd>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="border-t border-slate-200 pt-2">
-          {/* Other Actions */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-600">View Mode</span>
-              <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">V</kbd>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-600">History</span>
-              <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">H</kbd>
+        {showOtherActions && (
+          <div className="border-t border-slate-200 pt-2">
+            {/* Other Actions */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-600">View Mode</span>
+                <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">V</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-600">History</span>
+                <kbd className="px-2 py-0.5 text-xs font-mono bg-white border border-slate-300 rounded shadow-sm">H</kbd>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
