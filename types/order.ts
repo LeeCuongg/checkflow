@@ -20,6 +20,7 @@ export interface Order {
   channel?: string // Mera only: etsy | shopify | amazon | manual
   shopId?: string // Mera only: myshopify subdomain for Shopify orders
   sourceLink?: string // Mera only: free text, holds the listing URL for Amazon orders
+  material?: string // Mera only: item Material — the SKU on Amazon orders
   rowPosition?: number // 1-based row number in the Google Sheet
   _changes?: Record<string, { old: string; new: string }> | null
   _itemIdChanged?: string // Stores the expected itemId before sync detected a different order

@@ -10,7 +10,7 @@ import { LazyImage } from "@/components/ui/lazy-image"
 import { ExternalLink, User, Calendar, Store, Package, Copy, CheckCheck } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import type { Order } from "@/types/order"
-import { listingUrl, listingUrlTitle } from "@/lib/listing-url"
+import { isAmazonOrder, listingUrl, listingUrlTitle } from "@/lib/listing-url"
 
 interface OrderListItemProps {
   order: Order
@@ -98,7 +98,7 @@ export function OrderListItem({ order }: OrderListItemProps) {
     ...order,
     productName: order.productName?.replace(/\s+/g, " "),
   })
-  const isEtsyChannel = !["amazon", "shopify"].includes((order.channel ?? "").toLowerCase())
+  const isEtsyChannel = !isAmazonOrder(order) && (order.channel ?? "").toLowerCase() !== "shopify"
 
   const handleStoreClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -212,7 +212,7 @@ export function OrderListItem({ order }: OrderListItemProps) {
                     <p
                       className="text-gray-600 mt-1 cursor-pointer hover:text-blue-600 hover:underline transition-colors"
                       onClick={handleProductClick}
-                      title={listingUrlTitle(order.channel)}
+                      title={listingUrlTitle(order)}
                     >
                       {truncateText(order.productName, 60)}
                       <ExternalLink className="w-3 h-3 inline ml-1" />
@@ -228,10 +228,20 @@ export function OrderListItem({ order }: OrderListItemProps) {
                   <span
                     className="text-gray-600 cursor-pointer hover:text-blue-600 hover:underline transition-colors flex items-center gap-1"
                     onClick={handleStoreClick}
-                    title={isEtsyChannel ? "Click to open store on Etsy" : listingUrlTitle(order.channel)}
+                    title={isEtsyChannel ? "Click to open store on Etsy" : listingUrlTitle(order)}
                   >
                     {order.store}
                     <ExternalLink className="w-3 h-3" />
+                  </span>
+                </div>
+              )}
+
+              {isAmazonOrder(order) && order.material && (
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-gray-400" />
+                  <span className="font-medium text-gray-700">SKU:</span>
+                  <span className="text-gray-600 select-all" onClick={(e) => e.stopPropagation()}>
+                    {order.material}
                   </span>
                 </div>
               )}
