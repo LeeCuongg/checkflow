@@ -8,9 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import { useMeraProjects } from "@/hooks/use-mera-projects"
 import { useMeraBaseTemplates, type BaseTemplateActionOutcome } from "@/hooks/use-mera-base-templates"
-import { MeraProjectSelector } from "@/components/review/mera-project-selector"
 import { BaseTemplateListItem } from "@/components/base-templates/base-template-list-item"
 import { BaseTemplateReviewModal } from "@/components/base-templates/base-template-review-modal"
 import { NeedRepairDialog } from "@/components/base-templates/need-repair-dialog"
@@ -44,7 +42,6 @@ function conflictOrError(outcome: Extract<BaseTemplateActionOutcome, { ok: false
 }
 
 export default function BaseTemplatesPage() {
-  const [projectId, setProjectId] = useState("")
   const [reviewOpen, setReviewOpen] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
@@ -55,8 +52,8 @@ export default function BaseTemplatesPage() {
   const lastIndexRef = useRef(0)
   const rowRefs = useRef(new Map<string, HTMLDivElement>())
 
-  const { projects, loading: projectsLoading, error: projectsError } = useMeraProjects()
-  const bt = useMeraBaseTemplates({ projectId, search })
+  // Always every project: the queue is small, and each row names its project.
+  const bt = useMeraBaseTemplates({ projectId: "", search })
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS)
@@ -285,15 +282,6 @@ export default function BaseTemplatesPage() {
           </div>
         </div>
 
-        <MeraProjectSelector
-          projects={projects}
-          projectsLoading={projectsLoading}
-          selectedProjectId={projectId}
-          onProjectSelect={setProjectId}
-          ordersLoading={bt.loading}
-          error={projectsError}
-        />
-
         <Card className="border-gray-200 shadow-sm">
           <div className="p-6 space-y-4">
             {/* Header Row */}
@@ -418,7 +406,7 @@ export default function BaseTemplatesPage() {
                 }}
                 entry={entry}
                 selected={entry.key === selectedKey}
-                showProject={!projectId}
+                showProject
                 onOpen={() => openReview(entry.key)}
               />
             ))}
