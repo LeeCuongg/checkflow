@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { parseDesignLinks, resolveDesignUrls } from "@/utils/design-links"
 
-type Tile = { key: string; label: string; url?: string; loading?: boolean }
+type Tile = { key: string; label: string; url?: string; loading?: boolean; linkUrl?: string }
 
 // First viewable file of a design/mockup link (a Drive folder resolves to its files; the
 // resolver caches per link). Idle until `enabled`.
@@ -40,7 +40,8 @@ export function PreviewStrip({
   productImage?: string
   designLink?: string
   mockupLink?: string
-  onOpen: (url: string, label: string) => void
+  // linkUrl = the original design/mockup link (may be a Drive folder) for "Mở tab mới".
+  onOpen: (url: string, label: string, linkUrl?: string) => void
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [inView, setInView] = useState(false)
@@ -70,8 +71,8 @@ export function PreviewStrip({
 
   const tiles: Tile[] = [
     { key: "product", label: "Product", url: productImage },
-    { key: "design", label: "Design", url: design.url, loading: design.loading || (!inView && !!designLink) },
-    { key: "mockup", label: "Mockup", url: mockup.url, loading: mockup.loading || (!inView && !!mockupLink) },
+    { key: "design", label: "Design", linkUrl: designLink, url: design.url, loading: design.loading || (!inView && !!designLink) },
+    { key: "mockup", label: "Mockup", linkUrl: mockupLink, url: mockup.url, loading: mockup.loading || (!inView && !!mockupLink) },
   ]
 
   return (
@@ -88,7 +89,7 @@ export function PreviewStrip({
             className="relative cursor-zoom-in"
             onClick={(e) => {
               e.stopPropagation()
-              onOpen(t.url!, t.label)
+              onOpen(t.url!, t.label, t.linkUrl)
             }}
           >
             <LazyImage

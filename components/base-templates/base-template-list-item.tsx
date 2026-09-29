@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { forwardRef, useState } from "react"
-import { CheckCheck, Copy, ExternalLink, Globe, Layers, Package, User } from "lucide-react"
+import { CheckCheck, Copy, Globe, Layers, Package, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -68,7 +68,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
 ) {
   const { pt, variant } = entry
   const [copiedSlug, setCopiedSlug] = useState(false)
-  const [popup, setPopup] = useState<{ url: string; label: string } | null>(null)
+  const [popup, setPopup] = useState<{ url: string; label: string; linkUrl?: string } | null>(null)
   const showImage = (label: string) => (url: string) => setPopup({ url, label })
   const status = statusOf(variant)
   const pendingValues = variant.pending_values ?? []
@@ -92,11 +92,6 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
     } catch (error) {
       console.error("Failed to copy slug:", error)
     }
-  }
-
-  const open = (url: string) => (e: React.MouseEvent) => {
-    stop(e)
-    window.open(url, "_blank", "noopener,noreferrer")
   }
 
   return (
@@ -245,35 +240,11 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
 
             {/* Right: images */}
             <div className="space-y-3">
-              <div className="flex gap-2">
-                {variant.base_template_design && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={open(variant.base_template_design)}
-                    className="h-7 px-2 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Design
-                  </Button>
-                )}
-                {variant.base_template_mockup && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={open(variant.base_template_mockup)}
-                    className="h-7 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Mockup
-                  </Button>
-                )}
-              </div>
               <PreviewStrip
                 productImage={productImage}
                 designLink={variant.base_template_design}
                 mockupLink={variant.base_template_mockup}
-                onOpen={(url, label) => setPopup({ url, label: `${label} · ${pt.display_name || pt.slug}` })}
+                onOpen={(url, label, linkUrl) => setPopup({ url, label: `${label} · ${pt.display_name || pt.slug}`, linkUrl })}
               />
             </div>
           </div>
@@ -281,7 +252,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
       </Card>
       {/* Outside the Card: portal events still bubble through the React tree, and a click in
           the popup must not reach the Card's onClick (which opens the review). */}
-      <ImagePopup url={popup?.url ?? null} label={popup?.label} onClose={() => setPopup(null)} />
+      <ImagePopup url={popup?.url ?? null} label={popup?.label} linkUrl={popup?.linkUrl} onClose={() => setPopup(null)} />
     </>
   )
 })

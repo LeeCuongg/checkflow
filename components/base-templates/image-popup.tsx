@@ -10,10 +10,13 @@ import { LazyImage } from "@/components/ui/lazy-image"
 export function ImagePopup({
   url,
   label,
+  linkUrl,
   onClose,
 }: {
   url: string | null
   label?: string
+  // What "Mở tab mới" opens when it differs from the shown file (e.g. the Drive folder).
+  linkUrl?: string
   onClose: () => void
 }) {
   return (
@@ -39,7 +42,7 @@ export function ImagePopup({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+                onClick={() => window.open(linkUrl || url, "_blank", "noopener,noreferrer")}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Mở tab mới
