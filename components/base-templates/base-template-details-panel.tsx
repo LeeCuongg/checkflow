@@ -91,7 +91,7 @@ export function BaseTemplateDetailsPanel({
               <span className="font-medium">{pt.project_name || pt.project_id || "N/A"}</span>
             </div>
             <div>
-              <span className="text-gray-600">{sampleOrder?.store ? "Store" : "Product"}:</span>{" "}
+              <span className="text-gray-600">Store:</span>{" "}
               {sample.loading ? (
                 <span className="text-gray-500">Loading...</span>
               ) : sampleOrder?.store && storeListingUrl ? (
@@ -108,7 +108,7 @@ export function BaseTemplateDetailsPanel({
               ) : sampleOrder?.store ? (
                 <span className="font-medium">{sampleOrder.store}</span>
               ) : (
-                <span className="font-medium">{sampleOrder?.productName || "N/A"}</span>
+                <span className="font-medium">N/A</span>
               )}
               {sample.error && (
                 <span className="block text-[11px] text-gray-400" title={sample.error}>

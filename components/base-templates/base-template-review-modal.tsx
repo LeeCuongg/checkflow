@@ -132,7 +132,13 @@ export function BaseTemplateReviewModal({
   const designUrls = useDesignLinks(variant.base_template_design)
   const mockupUrls = useDesignLinks(variant.base_template_mockup)
 
-  const sample = useBaseTemplateSampleOrder(isOpen ? entry.key : null, pt.project_id, sampleItemKeyOf(variant))
+  const sample = useBaseTemplateSampleOrder(
+    isOpen ? entry.key : null,
+    pt.project_id,
+    sampleItemKeyOf(variant),
+    pt.slug,
+    variant.base_template_design
+  )
 
   const {
     data: productTypeNoteData,
