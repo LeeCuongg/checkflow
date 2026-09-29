@@ -61,6 +61,21 @@ export function listingUrl(input: ListingInput): string | null {
   return `https://www.etsy.com/shop/${encodeURIComponent(store)}?search_query=${encodeURIComponent(name)}`
 }
 
+const AMZ_NAME_RE = /\b(amz|amazon)\b/i
+
+// The SKU of an Amazon order: Mera keeps it in the item's Material. Only for Amazon orders —
+// on other manual orders Material holds unrelated notes. `contextName` (e.g. the project
+// name "CO AMZ - A Việt") counts as an Amazon signal too.
+export function amazonSku(order: ListingInput & { material?: string }, contextName?: string): string | null {
+  const sku = (order.material ?? "").trim()
+  if (!sku) return null
+  return isAmazonOrder(order) || AMZ_NAME_RE.test(contextName ?? "") ? sku : null
+}
+
+export function isAmazonContext(name?: string): boolean {
+  return AMZ_NAME_RE.test(name ?? "")
+}
+
 // Tooltip for the listing link. Accepts the order (preferred: an Amazon order is only known
 // from its Source Link) or, for older callers, just the channel.
 export function listingUrlTitle(input?: string | ListingInput): string {

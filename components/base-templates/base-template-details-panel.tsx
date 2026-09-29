@@ -4,7 +4,7 @@ import { ExternalLink, FileText, Clock, User, LinkIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { ProductTypeNoteSection } from "@/components/review/product-type-note-section"
-import { listingUrl, listingUrlTitle } from "@/lib/listing-url"
+import { amazonSku, listingUrl, listingUrlTitle } from "@/lib/listing-url"
 import { formatDate } from "@/utils/format-utils"
 import type { ProductTypeNoteResponse } from "@/types/order-review"
 import type { BaseTemplateProductType, BaseTemplateVariant } from "@/types/mera-base-template"
@@ -123,6 +123,12 @@ export function BaseTemplateDetailsPanel({
                 </span>
               )}
             </div>
+            {sampleOrder && amazonSku(sampleOrder, pt.project_name) && (
+              <div>
+                <span className="text-gray-600">SKU:</span>{" "}
+                <span className="font-medium select-all break-all">{amazonSku(sampleOrder, pt.project_name)}</span>
+              </div>
+            )}
             {sampleOrder?.country && (
               <div>
                 <span className="text-gray-600">Country:</span>{" "}
