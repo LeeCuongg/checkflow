@@ -82,17 +82,21 @@ export function useBaseTemplateSampleOrder(
         }
         return null
       }
-      // Fallback: an item of this product type, preferring one on this variant's design link.
+      // Fallback: an item of this product type. Rank: on this variant's design link first, then
+      // one that carries a Material (the SKU of an Amazon order) — the details it feeds are
+      // store / listing / SKU.
       const link = designLink.trim()
-      let firstOfType: ReturnType<typeof adaptMeraOrderWithItem> | null = null
+      let best: { rank: number; order: ReturnType<typeof adaptMeraOrderWithItem> } | null = null
       for (const order of orders) {
         for (const item of order.items ?? []) {
           if (item.product_type !== productType) continue
-          if (link && (item.design_link || "").trim() === link) return adaptMeraOrderWithItem(order, item)
-          if (!firstOfType) firstOfType = adaptMeraOrderWithItem(order, item)
+          const rank =
+            (link && (item.design_link || "").trim() === link ? 2 : 0) + ((item.material || "").trim() ? 1 : 0)
+          if (!best || rank > best.rank) best = { rank, order: adaptMeraOrderWithItem(order, item) }
+          if (rank === 3) return best.order
         }
       }
-      return firstOfType
+      return best?.order ?? null
     }
 
     run()

@@ -241,7 +241,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
                   <span className="font-medium text-gray-700">Countries:</span>
                   <span className="text-gray-600">{countriesLabel(variant)}</span>
                 </div>
-                {amzProject && (sku || sample.loading) && (
+                {amzProject && (
                   <div className="flex items-center gap-2 min-w-0">
                     <Tag className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     <span className="font-medium text-gray-700">SKU:</span>
@@ -249,8 +249,10 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
                       <span className="text-gray-600 select-all break-all" onClick={(e) => e.stopPropagation()}>
                         {sku}
                       </span>
-                    ) : (
+                    ) : sample.loading || !inView ? (
                       <span className="text-gray-400">Loading...</span>
+                    ) : (
+                      <span className="text-gray-600">N/A</span>
                     )}
                   </div>
                 )}
