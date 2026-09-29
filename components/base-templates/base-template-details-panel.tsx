@@ -4,7 +4,7 @@ import { ExternalLink, FileText, Clock, User, LinkIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { ProductTypeNoteSection } from "@/components/review/product-type-note-section"
-import { amazonSku, listingUrl, listingUrlTitle } from "@/lib/listing-url"
+import { isAmazonContext, isAmazonOrder, listingUrl, listingUrlTitle } from "@/lib/listing-url"
 import { formatDate } from "@/utils/format-utils"
 import type { ProductTypeNoteResponse } from "@/types/order-review"
 import type { BaseTemplateProductType, BaseTemplateVariant } from "@/types/mera-base-template"
@@ -71,6 +71,14 @@ export function BaseTemplateDetailsPanel({
 }: BaseTemplateDetailsPanelProps) {
   const sampleOrder = sample.order
   const storeListingUrl = sampleOrder ? listingUrl(sampleOrder) : null
+  // Amazon: SKU = item Material. Gathered from every waiting order plus the sample order (one
+  // variant can carry several SKUs); the row shows for any Amazon context, N/A when none has one.
+  const amazonOrders = [...pendingOrders.orders, ...(sampleOrder ? [sampleOrder] : [])].filter(isAmazonOrder)
+  const isAmazon = isAmazonContext(pt.project_name) || amazonOrders.length > 0
+  const skuSource = isAmazonContext(pt.project_name)
+    ? [...pendingOrders.orders, ...(sampleOrder ? [sampleOrder] : [])]
+    : amazonOrders
+  const skus = Array.from(new Set(skuSource.map((o) => (o.material || "").trim()).filter(Boolean)))
   const history = [...(variant.history ?? [])].sort((a, b) => (b.at || "").localeCompare(a.at || ""))
 
   return (
@@ -123,10 +131,21 @@ export function BaseTemplateDetailsPanel({
                 </span>
               )}
             </div>
-            {sampleOrder && amazonSku(sampleOrder, pt.project_name) && (
+            {isAmazon && (
               <div>
                 <span className="text-gray-600">SKU:</span>{" "}
-                <span className="font-medium select-all break-all">{amazonSku(sampleOrder, pt.project_name)}</span>
+                {skus.length > 0 ? (
+                  skus.map((s, i) => (
+                    <span key={s}>
+                      {i > 0 && <span className="text-gray-400"> · </span>}
+                      <span className="font-medium select-all break-all">{s}</span>
+                    </span>
+                  ))
+                ) : sample.loading || pendingOrders.loading ? (
+                  <span className="text-gray-500">Loading...</span>
+                ) : (
+                  <span className="font-medium">N/A</span>
+                )}
               </div>
             )}
             {sampleOrder?.country && (
