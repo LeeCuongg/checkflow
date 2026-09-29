@@ -10,6 +10,7 @@ import { LazyImage } from "@/components/ui/lazy-image"
 import { cn } from "@/lib/utils"
 import { BaseTemplateStatusBadge } from "./base-template-details-panel"
 import { ImagePopup } from "./image-popup"
+import { PreviewStrip } from "./preview-strip"
 import { type QueueEntry, conditionSummary, countriesLabel, hasNewValues, statusOf } from "./utils"
 
 interface BaseTemplateListItemProps {
@@ -268,25 +269,12 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
                   </Button>
                 )}
               </div>
-              {productImage && (
-                <div
-                  className="relative w-1/2 cursor-zoom-in"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPopup({ url: productImage, label: "Ảnh sản phẩm" })
-                  }}
-                >
-                  <LazyImage
-                    src={productImage}
-                    alt="Product"
-                    className="w-full h-20 rounded-lg border border-gray-200"
-                    fallbackSrc="/placeholder.svg?height=80&width=80&text=Product"
-                  />
-                  <span className="absolute bottom-1 left-1 text-xs bg-black bg-opacity-75 text-white px-1.5 py-0.5 rounded">
-                    Product
-                  </span>
-                </div>
-              )}
+              <PreviewStrip
+                productImage={productImage}
+                designLink={variant.base_template_design}
+                mockupLink={variant.base_template_mockup}
+                onOpen={(url, label) => setPopup({ url, label: `${label} · ${pt.display_name || pt.slug}` })}
+              />
             </div>
           </div>
         </div>
