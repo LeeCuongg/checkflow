@@ -106,7 +106,7 @@ export function BaseTemplateDetailsPanel({
                   href={storeListingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={listingUrlTitle(sampleOrder.channel)}
+                  title={listingUrlTitle(sampleOrder)}
                   className="font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
                 >
                   {sampleOrder.store}

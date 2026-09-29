@@ -15,7 +15,7 @@ import type {
 import { formatDate } from "@/utils/format-utils"
 import { OrderComments } from "@/components/review/order-comments"
 import { ProductTypeNoteSection } from "@/components/review/product-type-note-section"
-import { listingUrl, listingUrlTitle } from "@/lib/listing-url"
+import { isAmazonOrder, listingUrl, listingUrlTitle } from "@/lib/listing-url"
 
 interface OrderDetailsPanelProps {
   order: Order
@@ -198,7 +198,7 @@ export function OrderDetailsPanel({
                   href={storeListingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={listingUrlTitle(order.channel)}
+                  title={listingUrlTitle(order)}
                   className="font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
                 >
                   {order.store}
@@ -210,6 +210,12 @@ export function OrderDetailsPanel({
                 <span className="font-medium">{order.productName || "N/A"}</span>
               )}
             </div>
+            {isAmazonOrder(order) && order.material && (
+              <div>
+                <span className="text-gray-600">SKU:</span>{" "}
+                <span className="font-medium select-all">{order.material}</span>
+              </div>
+            )}
             {order.country && (
               <div>
                 <span className="text-gray-600">Country:</span>{" "}

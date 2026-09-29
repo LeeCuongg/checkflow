@@ -36,6 +36,7 @@ export function adaptMeraOrderWithItem(order: MeraOrder, item: MeraOrderItem): O
     channel: order.channel || undefined,
     shopId: order.shop_id || undefined,
     sourceLink: item.source_link || order.source_link || undefined,
+    material: item.material || undefined,
     rowPosition: undefined,
     _mera: order,
   }

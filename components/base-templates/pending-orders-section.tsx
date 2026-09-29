@@ -5,7 +5,7 @@ import { CheckCheck, Copy, ExternalLink, Loader2, Package, RefreshCw } from "luc
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { listingUrl, listingUrlTitle } from "@/lib/listing-url"
+import { isAmazonOrder, listingUrl, listingUrlTitle } from "@/lib/listing-url"
 import { formatDate } from "@/utils/format-utils"
 import type { PendingOrder, PendingOrdersState } from "@/hooks/use-base-template-pending-orders"
 
@@ -232,7 +232,7 @@ function PendingOrderCard({
                 href={storeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                title={listingUrlTitle(order.channel)}
+                title={listingUrlTitle(order)}
                 className="font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
               >
                 {order.store}
@@ -243,6 +243,12 @@ function PendingOrderCard({
             )}
             {order.country && <span className="text-gray-500"> · {order.country}</span>}
           </div>
+          {isAmazonOrder(order) && order.material && (
+            <div>
+              <span className="text-gray-600">SKU:</span>{" "}
+              <span className="font-medium select-all">{order.material}</span>
+            </div>
+          )}
         </div>
       </div>
 
