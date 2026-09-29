@@ -2,12 +2,15 @@
 
 import type React from "react"
 import { forwardRef, useState } from "react"
-import { CheckCheck, Copy, Globe, Layers, Package, User } from "lucide-react"
+import { CheckCheck, Copy, Globe, Layers, Package, Tag, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { cn } from "@/lib/utils"
+import { amazonSku, isAmazonContext } from "@/lib/listing-url"
+import { useInView } from "@/hooks/use-in-view"
+import { sampleItemKeyOf, useBaseTemplateSampleOrder } from "@/hooks/use-base-template-sample-order"
 import { BaseTemplateStatusBadge } from "./base-template-details-panel"
 import { ImagePopup } from "./image-popup"
 import { PreviewStrip } from "./preview-strip"
@@ -69,6 +72,18 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
   const { pt, variant } = entry
   const [copiedSlug, setCopiedSlug] = useState(false)
   const [popup, setPopup] = useState<{ url: string; label: string; linkUrl?: string } | null>(null)
+  // Amazon SKU lives on the orders (item Material). Only AMZ projects look it up, and only once
+  // the row is on screen — one cached sample-order lookup per row, not one per list load.
+  const { ref: infoRef, inView } = useInView<HTMLDivElement>()
+  const amzProject = isAmazonContext(pt.project_name)
+  const sample = useBaseTemplateSampleOrder(
+    inView && amzProject ? entry.key : null,
+    pt.project_id,
+    sampleItemKeyOf(variant),
+    pt.slug,
+    variant.base_template_design
+  )
+  const sku = sample.order ? amazonSku(sample.order, pt.project_name) : null
   const showImage = (label: string) => (url: string) => setPopup({ url, label })
   const status = statusOf(variant)
   const pendingValues = variant.pending_values ?? []
@@ -215,7 +230,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div ref={infoRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div className="flex items-start gap-2 min-w-0" style={{ gridColumn: "1 / -1" }}>
                   <Package className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
                   <span className="font-medium text-gray-700 whitespace-nowrap">Product type:</span>
@@ -226,6 +241,19 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
                   <span className="font-medium text-gray-700">Countries:</span>
                   <span className="text-gray-600">{countriesLabel(variant)}</span>
                 </div>
+                {amzProject && (sku || sample.loading) && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Tag className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <span className="font-medium text-gray-700">SKU:</span>
+                    {sku ? (
+                      <span className="text-gray-600 select-all break-all" onClick={(e) => e.stopPropagation()}>
+                        {sku}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">Loading...</span>
+                    )}
+                  </div>
+                )}
                 {showProject && pt.project_name && (
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-gray-400" />
