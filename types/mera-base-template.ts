@@ -11,6 +11,10 @@
 // survives until the Mera migration retires it.
 export const BASE_TEMPLATE_PENDING_STATUSES = ["DESIGNED", "REPAIRED", "SUPPORT CHECK"] as const
 
+// Mera paginates by product type. The queue is small (only product types with something to
+// review), so one generous page is loaded; the page warns when Mera reports more.
+export const BASE_TEMPLATE_PAGE_LIMIT = 200
+
 export interface BaseTemplateHistoryEntry {
   status: string
   design_link?: string

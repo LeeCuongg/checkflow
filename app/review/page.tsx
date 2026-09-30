@@ -11,6 +11,7 @@ import { MeraProjectSelector } from "@/components/review/mera-project-selector"
 import { OrderListHeader } from "@/components/review/order-list-header"
 import { OrderList } from "@/components/review/order-list"
 import { SyncStatusIndicator } from "@/components/sync-status-indicator"
+import { BaseTemplateStatsCard } from "@/components/base-templates/base-template-stats-card"
 import type { Order } from "@/types/order"
 import type { MeraOrder, MeraListOrdersParams } from "@/types/mera-order"
 import { useState, useEffect, useMemo } from "react"
@@ -37,7 +38,7 @@ export default function ReviewPage() {
   const { toast } = useToast()
 
   // ── Source toggle ──────────────────────────────────────────────────────────
-  const [dataSource, setDataSource] = useState<DataSource>("sheets")
+  const [dataSource, setDataSource] = useState<DataSource>("mera")
 
   // ── Mera state ────────────────────────────────────────────────────────────
   const [meraProjectId, setMeraProjectId] = useState<string>("")
@@ -790,17 +791,6 @@ export default function ReviewPage() {
               {/* Source toggle */}
               <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
                 <button
-                  onClick={() => setDataSource("sheets")}
-                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
-                    dataSource === "sheets"
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  <Sheet className="h-4 w-4" />
-                  Google Sheets
-                </button>
-                <button
                   onClick={() => setDataSource("mera")}
                   className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
                     dataSource === "mera"
@@ -810,6 +800,17 @@ export default function ReviewPage() {
                 >
                   <Database className="h-4 w-4" />
                   Mera
+                </button>
+                <button
+                  onClick={() => setDataSource("sheets")}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                    dataSource === "sheets"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Sheet className="h-4 w-4" />
+                  Google Sheets
                 </button>
               </div>
 
@@ -824,6 +825,8 @@ export default function ReviewPage() {
             </div>
           </div>
         </div>
+
+        <BaseTemplateStatsCard />
 
         {/* Sheets source */}
         {dataSource === "sheets" && (

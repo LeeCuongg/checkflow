@@ -26,6 +26,12 @@ export function needsReview(v: BaseTemplateVariant): boolean {
   return st === "" || st === "REPAIRED" || (v.pending_count ?? 0) > 0
 }
 
+// In the queue AND holding orders back right now — the default queue filter and the yellow
+// sidebar count.
+export const hasWaitingOrders = (v: BaseTemplateVariant) => needsReview(v) && (v.pending_count ?? 0) > 0
+
+export const isNeedRepair = (v: BaseTemplateVariant) => statusOf(v) === "NEED REPAIR"
+
 export const hasNewValues = (v: BaseTemplateVariant) => (v.pending_values ?? []).some((p) => !p.approved)
 
 export function flattenEntries(
@@ -40,6 +46,14 @@ export function flattenEntries(
     }
   }
   return out
+}
+
+// Variant counts shown on the sidebar / the Order Review card (GET /api/mera/base-templates/counts).
+export interface BaseTemplateCounts {
+  waiting: number // in the queue with waiting orders
+  repair: number // NEED REPAIR — waiting for the designer
+  // Mera reported more product types than one page holds → the numbers are a lower bound.
+  partial: boolean
 }
 
 const formatCondition = (c: BaseTemplateMatchCondition) =>
