@@ -25,6 +25,7 @@ import {
 import { LogOut, ChevronDown, Zap, FileText, Eye, AlertTriangle, ScrollText, CheckCircle, LayoutTemplate, type LucideIcon } from "lucide-react" // Added CheckCircle icon
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
+import { useBaseTemplateCounts } from "@/hooks/use-base-template-counts"
 import { useRouter, usePathname } from "next/navigation"
 import { Settings, HelpCircle } from "lucide-react"
 
@@ -67,6 +68,35 @@ const navigationItems: Array<{
 ]
 
 const adminItems = []
+
+// Base Templates: yellow = in the queue with waiting orders, red = waiting for the designer.
+function BaseTemplateNavBadges() {
+  const { counts } = useBaseTemplateCounts()
+  if (!counts) return null
+  const plus = counts.partial ? "+" : ""
+  return (
+    <span className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
+      {counts.waiting > 0 && (
+        <span
+          title={`${counts.waiting}${plus} template chờ duyệt đang có đơn`}
+          className="min-w-5 h-5 px-1.5 rounded-full bg-amber-400 text-amber-950 text-xs font-semibold tabular-nums flex items-center justify-center"
+        >
+          {counts.waiting}
+          {plus}
+        </span>
+      )}
+      {counts.repair > 0 && (
+        <span
+          title={`${counts.repair}${plus} template chờ designer sửa`}
+          className="min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold tabular-nums flex items-center justify-center"
+        >
+          {counts.repair}
+          {plus}
+        </span>
+      )}
+    </span>
+  )
+}
 
 export function AppSidebar() {
   const { user, signOut } = useAuth()
@@ -115,6 +145,7 @@ export function AppSidebar() {
                       {" "}
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
+                      {item.url === "/base-templates" && <BaseTemplateNavBadges />}
                       {item.badge && (
                         <Badge variant="secondary" className="ml-auto bg-pink-100 text-pink-700 text-xs">
                           {item.badge}

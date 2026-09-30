@@ -3,18 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { logError } from "@/lib/sentry"
-import type {
-  BaseTemplateActionResult,
-  BaseTemplateListResponse,
-  BaseTemplateProductType,
-  BaseTemplateSettings,
-  CheckflowBaseTemplateConfirmRequest,
-  CheckflowBaseTemplateNeedRepairRequest,
+import { notifyBaseTemplatesChanged } from "@/hooks/use-base-template-counts"
+import {
+  BASE_TEMPLATE_PAGE_LIMIT,
+  type BaseTemplateActionResult,
+  type BaseTemplateListResponse,
+  type BaseTemplateProductType,
+  type BaseTemplateSettings,
+  type CheckflowBaseTemplateConfirmRequest,
+  type CheckflowBaseTemplateNeedRepairRequest,
 } from "@/types/mera-base-template"
-
-// Mera paginates by product type. The queue is small (only product types with something to
-// review), so one generous page is loaded; the page warns when Mera reports more.
-export const BASE_TEMPLATE_PAGE_LIMIT = 200
 
 export type BaseTemplateActionOutcome =
   | { ok: true; data: BaseTemplateActionResult }
@@ -132,6 +130,8 @@ export function useMeraBaseTemplates({ projectId, search, enabled = true }: Opti
   const runAction = useCallback(
     async (url: string, body: unknown): Promise<BaseTemplateActionOutcome> => {
       const { res, payload } = await call(url, { method: "POST", body })
+      // Success or conflict alike, some template state moved — sidebar / card counts reload.
+      notifyBaseTemplatesChanged()
       if (res.ok) return { ok: true, data: payload as BaseTemplateActionResult }
       return { ok: false, status: res.status, body: payload ?? {} }
     },

@@ -11,12 +11,15 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import { useMeraBaseTemplates, type BaseTemplateActionOutcome } from "@/hooks/use-mera-base-templates"
 import { useMeraProjects } from "@/hooks/use-mera-projects"
+import { notifyBaseTemplatesChanged } from "@/hooks/use-base-template-counts"
 import { BaseTemplateListItem } from "@/components/base-templates/base-template-list-item"
 import { BaseTemplateReviewModal } from "@/components/base-templates/base-template-review-modal"
 import { NeedRepairDialog } from "@/components/base-templates/need-repair-dialog"
 import {
   type QueueEntry,
   flattenEntries,
+  hasWaitingOrders,
+  isNeedRepair,
   isTypingTarget,
   needsReview,
   statusOf,
@@ -51,6 +54,8 @@ export default function BaseTemplatesPage() {
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
   const [tab, setTab] = useState<QueueTab>("queue")
+  // Queue tab: only variants holding orders back right now. On by default on every visit.
+  const [onlyWithOrders, setOnlyWithOrders] = useState(true)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [repairOpen, setRepairOpen] = useState(false)
   const [busy, setBusy] = useState<"confirm" | "repair" | null>(null)
@@ -104,11 +109,11 @@ export default function BaseTemplatesPage() {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  const queueEntries = useMemo(() => flattenEntries(bt.queue, needsReview), [bt.queue])
-  const repairEntries = useMemo(
-    () => flattenEntries(bt.repair, (v) => statusOf(v) === "NEED REPAIR"),
-    [bt.repair]
+  const queueEntries = useMemo(
+    () => flattenEntries(bt.queue, onlyWithOrders ? hasWaitingOrders : needsReview),
+    [bt.queue, onlyWithOrders]
   )
+  const repairEntries = useMemo(() => flattenEntries(bt.repair, isNeedRepair), [bt.repair])
   const entries: QueueEntry[] = tab === "queue" ? queueEntries : repairEntries
 
   // Keep a valid selection: when the selected variant leaves the list (confirmed, filtered
@@ -351,7 +356,10 @@ export default function BaseTemplatesPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => bt.refetch({ nocache: true })}
+                  onClick={() => {
+                    notifyBaseTemplatesChanged()
+                    void bt.refetch({ nocache: true })
+                  }}
                   disabled={bt.loading}
                   className="flex items-center gap-2 bg-transparent border-gray-300"
                 >
@@ -404,6 +412,17 @@ export default function BaseTemplatesPage() {
                   <TabsTrigger value="repair">Chờ designer sửa ({repairEntries.length})</TabsTrigger>
                 </TabsList>
               </Tabs>
+              {tab === "queue" && (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={onlyWithOrders}
+                    onChange={(e) => setOnlyWithOrders(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Chỉ template có đơn chờ
+                </label>
+              )}
             </div>
 
             {bt.settings && autoStatusOff && (
@@ -458,12 +477,18 @@ export default function BaseTemplatesPage() {
                 <h3 className="text-xl font-semibold text-gray-900">
                   {tab === "queue" ? "Không có base template nào cần duyệt." : "Không có template nào chờ designer sửa."}
                 </h3>
-                {(search.trim() || projectId) && (
+                {tab === "queue" && onlyWithOrders ? (
                   <p className="text-sm text-gray-500 mt-2">
-                    {projectId
-                      ? "Đang lọc theo một project — thử chọn “Tất cả project”."
-                      : "Thử bỏ bớt từ khoá tìm kiếm."}
+                    Đang chỉ hiện template có đơn chờ — bỏ chọn “Chỉ template có đơn chờ” để xem cả hàng đợi.
                   </p>
+                ) : (
+                  (search.trim() || projectId) && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      {projectId
+                        ? "Đang lọc theo một project — thử chọn “Tất cả project”."
+                        : "Thử bỏ bớt từ khoá tìm kiếm."}
+                    </p>
+                  )
                 )}
               </div>
             </div>

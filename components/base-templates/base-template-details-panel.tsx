@@ -4,6 +4,7 @@ import { ExternalLink, FileText, Clock, User, LinkIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { ProductTypeNoteSection } from "@/components/review/product-type-note-section"
+import { OrderComments } from "@/components/review/order-comments"
 import { isAmazonContext, isAmazonOrder, listingUrl, listingUrlTitle } from "@/lib/listing-url"
 import { formatDate } from "@/utils/format-utils"
 import type { ProductTypeNoteResponse } from "@/types/order-review"
@@ -51,8 +52,14 @@ interface BaseTemplateDetailsPanelProps {
   onShowOrderImage: (url: string, label: string, source: "order" | "customer") => void
 }
 
+// Discussion thread of one variant, in the same table / realtime channel as order comments.
+// Keyed by product type id (survives a slug rename) + variant, not by design link (changes
+// on every redesign).
+export const baseTemplateCommentKey = (pt: BaseTemplateProductType, v: BaseTemplateVariant) =>
+  `bt:${pt.project_id}:${pt.product_type_id || pt.slug}:${v.variant_key}`
+
 // Right column of the base template review modal — laid out like OrderDetailsPanel:
-// Details → waiting orders → Mockup & Design Links → Note for <product type> (shared component, same note
+// Discussion → Details → waiting orders → Mockup & Design Links → Note for <product type> (shared component, same note
 // as the order review screen) → history (like "Order History").
 export function BaseTemplateDetailsPanel({
   pt,
@@ -83,6 +90,9 @@ export function BaseTemplateDetailsPanel({
 
   return (
     <>
+      {/* Discussion */}
+      <OrderComments itemId={baseTemplateCommentKey(pt, variant)} />
+
       {/* Template Details */}
       <div className="border-b border-gray-200">
         <div className="p-4">
