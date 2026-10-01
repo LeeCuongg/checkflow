@@ -31,6 +31,8 @@ export function useMeraBaseTemplates({ projectId, search, enabled = true }: Opti
   const [queueTotal, setQueueTotal] = useState(0)
   const [repair, setRepair] = useState<BaseTemplateProductType[]>([])
   const [repairTotal, setRepairTotal] = useState(0)
+  const [confirmed, setConfirmed] = useState<BaseTemplateProductType[]>([])
+  const [confirmedTotal, setConfirmedTotal] = useState(0)
   const [settings, setSettings] = useState<BaseTemplateSettings | null>(null)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -91,9 +93,10 @@ export function useMeraBaseTemplates({ projectId, search, enabled = true }: Opti
         })
 
       try {
-        const [q, r] = await Promise.all([
+        const [q, r, c] = await Promise.all([
           call(listUrl({ queue: "true", ...nc })),
           call(listUrl({ status: "NEED REPAIR", ...nc })),
+          call(listUrl({ status: "CONFIRMED", ...nc })),
         ])
         if (seq !== requestSeq.current) return
         if (!q.res.ok) throw new Error(q.payload.error || `HTTP ${q.res.status}`)
@@ -107,6 +110,14 @@ export function useMeraBaseTemplates({ projectId, search, enabled = true }: Opti
         } else {
           setRepair([])
           setRepairTotal(0)
+        }
+        if (c.res.ok) {
+          const cData = c.payload as BaseTemplateListResponse
+          setConfirmed(cData.items ?? [])
+          setConfirmedTotal(cData.total ?? 0)
+        } else {
+          setConfirmed([])
+          setConfirmedTotal(0)
         }
       } catch (err) {
         if (seq !== requestSeq.current) return
@@ -153,6 +164,8 @@ export function useMeraBaseTemplates({ projectId, search, enabled = true }: Opti
     queueTotal,
     repair,
     repairTotal,
+    confirmed,
+    confirmedTotal,
     settings,
     settingsError,
     loading,

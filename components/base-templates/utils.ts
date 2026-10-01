@@ -1,4 +1,5 @@
 import type {
+  BaseTemplateHistoryEntry,
   BaseTemplateMatchCondition,
   BaseTemplateProductType,
   BaseTemplateVariant,
@@ -32,6 +33,22 @@ export const hasWaitingOrders = (v: BaseTemplateVariant) => needsReview(v) && (v
 
 export const isNeedRepair = (v: BaseTemplateVariant) => statusOf(v) === "NEED REPAIR"
 
+export const isConfirmed = (v: BaseTemplateVariant) => statusOf(v) === "CONFIRMED"
+
+// The history entry of the latest approval (who / when), if Mera recorded one.
+export function lastConfirmation(v: BaseTemplateVariant): BaseTemplateHistoryEntry | null {
+  let latest: BaseTemplateHistoryEntry | null = null
+  for (const h of v.history ?? []) {
+    if ((h.status || "").trim().toUpperCase() !== "CONFIRMED" || !h.at) continue
+    if (!latest || h.at > latest.at) latest = h
+  }
+  return latest
+}
+
+// "YYYY-MM-DD" in Vietnam time — the team's day, whatever the server's timezone.
+export const vnDay = (iso: string | Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(iso))
+
 export const hasNewValues = (v: BaseTemplateVariant) => (v.pending_values ?? []).some((p) => !p.approved)
 
 export function flattenEntries(
@@ -52,6 +69,8 @@ export function flattenEntries(
 export interface BaseTemplateCounts {
   waiting: number // in the queue with waiting orders
   repair: number // NEED REPAIR — waiting for the designer
+  confirmed: number // CONFIRMED
+  confirmedToday: number // CONFIRMED with the latest approval today (Vietnam time)
   // Mera reported more product types than one page holds → the numbers are a lower bound.
   partial: boolean
 }

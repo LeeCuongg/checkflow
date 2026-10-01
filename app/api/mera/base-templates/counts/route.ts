@@ -6,7 +6,10 @@ import {
   type BaseTemplateCounts,
   flattenEntries,
   hasWaitingOrders,
+  isConfirmed,
   isNeedRepair,
+  lastConfirmation,
+  vnDay,
 } from "@/components/base-templates/utils"
 
 export const dynamic = "force-dynamic"
@@ -22,16 +25,23 @@ export async function GET(request: NextRequest) {
   const base = { limit: BASE_TEMPLATE_PAGE_LIMIT, nocache }
 
   try {
-    const [queue, repair] = await Promise.all([
+    const [queue, repair, confirmed] = await Promise.all([
       meraClient.listBaseTemplates(auth.actor, { ...base, queue: true }),
       meraClient.listBaseTemplates(auth.actor, { ...base, status: "NEED REPAIR" }),
+      meraClient.listBaseTemplates(auth.actor, { ...base, status: "CONFIRMED" }),
     ])
-    const queueItems = queue.items ?? []
-    const repairItems = repair.items ?? []
+    const lists = [queue, repair, confirmed]
+    const confirmedEntries = flattenEntries(confirmed.items ?? [], isConfirmed)
+    const today = vnDay(new Date())
     const body: BaseTemplateCounts = {
-      waiting: flattenEntries(queueItems, hasWaitingOrders).length,
-      repair: flattenEntries(repairItems, isNeedRepair).length,
-      partial: (queue.total ?? 0) > queueItems.length || (repair.total ?? 0) > repairItems.length,
+      waiting: flattenEntries(queue.items ?? [], hasWaitingOrders).length,
+      repair: flattenEntries(repair.items ?? [], isNeedRepair).length,
+      confirmed: confirmedEntries.length,
+      confirmedToday: confirmedEntries.filter((e) => {
+        const c = lastConfirmation(e.variant)
+        return !!c && vnDay(c.at) === today
+      }).length,
+      partial: lists.some((l) => (l.total ?? 0) > (l.items ?? []).length),
     }
     return NextResponse.json(body)
   } catch (err) {

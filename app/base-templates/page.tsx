@@ -19,13 +19,21 @@ import {
   type QueueEntry,
   flattenEntries,
   hasWaitingOrders,
+  isConfirmed,
   isNeedRepair,
+  lastConfirmation,
   isTypingTarget,
   needsReview,
   statusOf,
 } from "@/components/base-templates/utils"
 
-type QueueTab = "queue" | "repair"
+type QueueTab = "queue" | "repair" | "confirmed"
+
+const TAB_LABEL: Record<QueueTab, string> = {
+  queue: " cần duyệt",
+  repair: " chờ designer sửa",
+  confirmed: " đã duyệt",
+}
 
 const SEARCH_DEBOUNCE_MS = 400
 const PROJECT_FILTER_KEY = "base-templates-project-filter"
@@ -114,7 +122,17 @@ export default function BaseTemplatesPage() {
     [bt.queue, onlyWithOrders]
   )
   const repairEntries = useMemo(() => flattenEntries(bt.repair, isNeedRepair), [bt.repair])
-  const entries: QueueEntry[] = tab === "queue" ? queueEntries : repairEntries
+  // Latest approval first.
+  const confirmedEntries = useMemo(
+    () =>
+      flattenEntries(bt.confirmed, isConfirmed)
+        .map((e) => ({ e, at: lastConfirmation(e.variant)?.at ?? "" }))
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .map(({ e }) => e),
+    [bt.confirmed]
+  )
+  const entries: QueueEntry[] =
+    tab === "queue" ? queueEntries : tab === "repair" ? repairEntries : confirmedEntries
 
   // Keep a valid selection: when the selected variant leaves the list (confirmed, filtered
   // out, tab switch), fall back to whatever now sits at the same position.
@@ -305,8 +323,8 @@ export default function BaseTemplatesPage() {
     return () => document.removeEventListener("keydown", onKeyDown)
   }, [reviewOpen, openReview])
 
-  const loadedPtCount = tab === "queue" ? bt.queue.length : bt.repair.length
-  const reportedPtTotal = tab === "queue" ? bt.queueTotal : bt.repairTotal
+  const loadedPtCount = { queue: bt.queue, repair: bt.repair, confirmed: bt.confirmed }[tab].length
+  const reportedPtTotal = { queue: bt.queueTotal, repair: bt.repairTotal, confirmed: bt.confirmedTotal }[tab]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -339,7 +357,7 @@ export default function BaseTemplatesPage() {
               <div className="flex items-center gap-4">
                 <h2 className="text-xl font-semibold text-gray-900">Base Templates</h2>
                 <span className="text-sm text-gray-600">
-                  {entries.length.toLocaleString()} variant{tab === "queue" ? " cần duyệt" : " chờ designer sửa"}
+                  {entries.length.toLocaleString()} variant{TAB_LABEL[tab]}
                 </span>
                 {projectId && (
                   <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
@@ -410,6 +428,7 @@ export default function BaseTemplatesPage() {
                 <TabsList>
                   <TabsTrigger value="queue">Hàng đợi ({queueEntries.length})</TabsTrigger>
                   <TabsTrigger value="repair">Chờ designer sửa ({repairEntries.length})</TabsTrigger>
+                  <TabsTrigger value="confirmed">Đã duyệt ({confirmedEntries.length})</TabsTrigger>
                 </TabsList>
               </Tabs>
               {tab === "queue" && (
@@ -458,6 +477,12 @@ export default function BaseTemplatesPage() {
                 đợi (REPAIRED).
               </div>
             )}
+            {tab === "confirmed" && (
+              <div className="text-xs text-gray-500">
+                Chỉ xem — các template đã duyệt (CONFIRMED), mới duyệt xếp trước. Template nào có đơn mang giá trị mới sẽ
+                quay lại hàng đợi.
+              </div>
+            )}
           </div>
         </Card>
 
@@ -475,7 +500,11 @@ export default function BaseTemplatesPage() {
               <Stamp className="h-12 w-12 text-gray-400" />
               <div className="text-center">
                 <h3 className="text-xl font-semibold text-gray-900">
-                  {tab === "queue" ? "Không có base template nào cần duyệt." : "Không có template nào chờ designer sửa."}
+                  {tab === "queue"
+                    ? "Không có base template nào cần duyệt."
+                    : tab === "repair"
+                      ? "Không có template nào chờ designer sửa."
+                      : "Chưa có template nào đã duyệt."}
                 </h3>
                 {tab === "queue" && onlyWithOrders ? (
                   <p className="text-sm text-gray-500 mt-2">
@@ -524,7 +553,7 @@ export default function BaseTemplatesPage() {
             totalCount={entries.length}
             onNext={goNext}
             onPrevious={goPrev}
-            readOnly={tab === "repair"}
+            readOnly={tab !== "queue"}
             busy={busy}
             canConfirm={canConfirm}
             canAct={canAct}

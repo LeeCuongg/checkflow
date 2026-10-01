@@ -535,8 +535,9 @@ export function BaseTemplateReviewModal({
 
               {readOnly ? (
                 <div className="rounded-lg p-3 border border-gray-200 bg-white text-xs text-gray-600">
-                  Chỉ xem — template đang chờ designer sửa. Khi designer bấm “Đã sửa xong”, nó quay lại hàng đợi
-                  (REPAIRED).
+                  {status === "CONFIRMED"
+                    ? "Chỉ xem — template đã duyệt. Nếu có đơn mang giá trị mới, nó sẽ quay lại hàng đợi."
+                    : "Chỉ xem — template đang chờ designer sửa. Khi designer bấm “Đã sửa xong”, nó quay lại hàng đợi (REPAIRED)."}
                 </div>
               ) : (
                 <>

@@ -40,7 +40,7 @@ export function BaseTemplateStatsCard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
           <div className="text-sm text-amber-900">Chờ duyệt có đơn</div>
           <div className="text-2xl font-bold text-amber-700 tabular-nums">{value(counts?.waiting)}</div>
@@ -48,6 +48,13 @@ export function BaseTemplateStatsCard() {
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3">
           <div className="text-sm text-red-900">Chờ designer sửa</div>
           <div className="text-2xl font-bold text-red-700 tabular-nums">{value(counts?.repair)}</div>
+        </div>
+        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3">
+          <div className="text-sm text-green-900">Đã duyệt</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-green-700 tabular-nums">{value(counts?.confirmed)}</span>
+            {counts && <span className="text-xs text-green-800">hôm nay: {counts.confirmedToday.toLocaleString()}</span>}
+          </div>
         </div>
       </div>
 

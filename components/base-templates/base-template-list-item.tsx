@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { forwardRef, useState } from "react"
-import { CheckCheck, Copy, Globe, Layers, Package, Tag, User } from "lucide-react"
+import { BadgeCheck, CheckCheck, Copy, Globe, Layers, Package, Tag, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -14,7 +14,8 @@ import { sampleItemKeyOf, useBaseTemplateSampleOrder } from "@/hooks/use-base-te
 import { BaseTemplateStatusBadge } from "./base-template-details-panel"
 import { ImagePopup } from "./image-popup"
 import { PreviewStrip } from "./preview-strip"
-import { type QueueEntry, conditionSummary, countriesLabel, hasNewValues, statusOf } from "./utils"
+import { formatDate } from "@/utils/format-utils"
+import { type QueueEntry, conditionSummary, countriesLabel, hasNewValues, lastConfirmation, statusOf } from "./utils"
 
 interface BaseTemplateListItemProps {
   entry: QueueEntry
@@ -86,6 +87,7 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
   const sku = sample.order ? amazonSku(sample.order, pt.project_name) : null
   const showImage = (label: string) => (url: string) => setPopup({ url, label })
   const status = statusOf(variant)
+  const confirmation = status === "CONFIRMED" ? lastConfirmation(variant) : null
   const pendingValues = variant.pending_values ?? []
   // Product type photo sits next to the name; the right column shows photos of orders that
   // match this variant.
@@ -145,6 +147,13 @@ export const BaseTemplateListItem = forwardRef<HTMLDivElement, BaseTemplateListI
                 </Button>
               </div>
               <BaseTemplateStatusBadge status={status} />
+              {confirmation && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                  <BadgeCheck className="w-3 h-3 mr-1" />
+                  {confirmation.actor_email ? `${confirmation.actor_email} · ` : ""}
+                  {formatDate(confirmation.at)}
+                </Badge>
+              )}
               {variant.designer && (
                 <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200">
                   <User className="w-3 h-3 mr-1" />
