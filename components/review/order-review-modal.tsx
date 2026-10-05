@@ -1266,6 +1266,7 @@ export function OrderReviewModal({
               productTypeNoteError={productTypeNoteError}
               refetchProductTypeNote={refetchProductTypeNote}
               getCachedImageUrl={getCachedImageUrl}
+              onShowProductImage={() => setActiveTab("product")}
             />
           </div>
         </div>

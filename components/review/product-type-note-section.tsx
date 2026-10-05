@@ -55,6 +55,21 @@ export function ProductTypeNoteSection({
     })
   }
 
+  // One image of the note. Also used for the product photos of an empty note, so those look
+  // exactly like an image URL pasted into the note by hand.
+  const renderNoteImage = (url: string, key: string | number, onClick: () => void) => (
+    <div key={key} className="w-full">
+      <LazyImage
+        src={getCachedImageUrl(url) || url}
+        alt="Product type note image"
+        className="w-full h-auto object-contain rounded border border-gray-200 cursor-pointer"
+        fit="contain"
+        onClick={onClick}
+        fallbackSrc="/placeholder.svg?height=200&width=300&text=Image"
+      />
+    </div>
+  )
+
   const renderNoteContent = (content: string) => {
     if (!content) return null
 
@@ -67,18 +82,7 @@ export function ProductTypeNoteSection({
           if (urlRegex.test(part)) {
             const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(part)
             if (isImage) {
-              return (
-                <div key={index} className="w-full">
-                  <LazyImage
-                    src={getCachedImageUrl(part) || part}
-                    alt="Product type note image"
-                    className="w-full h-auto object-contain rounded border border-gray-200 cursor-pointer"
-                    fit="contain"
-                    onClick={() => window.open(part, "_blank")}
-                    fallbackSrc="/placeholder.svg?height=200&width=300&text=Image"
-                  />
-                </div>
-              )
+              return renderNoteImage(part, index, () => window.open(part, "_blank"))
             } else {
               return (
                 <a
@@ -222,20 +226,11 @@ export function ProductTypeNoteSection({
               renderNoteContent(productTypeNote)
             ) : emptyImages && emptyImages.length > 0 ? (
               <div className="space-y-2">
-                <div className="text-xs text-gray-500 italic">Chưa có note — ảnh sản phẩm (bấm Edit để thêm note):</div>
-                <div className="gap-2" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-                  {emptyImages.map((url) => (
-                    <LazyImage
-                      key={url}
-                      src={getCachedImageUrl(url) || url}
-                      alt="Product"
-                      className="w-full h-24 rounded border border-orange-200 cursor-pointer"
-                      fit="cover"
-                      onClick={() => (onEmptyImageClick ? onEmptyImageClick(url) : window.open(url, "_blank"))}
-                      fallbackSrc="/placeholder.svg?height=96&width=96&text=Product"
-                    />
-                  ))}
-                </div>
+                {emptyImages.map((url) =>
+                  renderNoteImage(url, url, () =>
+                    onEmptyImageClick ? onEmptyImageClick(url) : window.open(url, "_blank"),
+                  ),
+                )}
               </div>
             ) : (
               <div className="text-xs text-gray-500 italic">

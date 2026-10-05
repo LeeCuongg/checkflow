@@ -32,6 +32,8 @@ interface OrderDetailsPanelProps {
   refetchProductTypeNote: () => void
   getCachedImageUrl: (url: string | null | undefined) => string | null
   onOrderUpdate?: () => void
+  // Click on the product photo shown in an empty product type note (e.g. open the Product tab).
+  onShowProductImage?: () => void
 }
 
 export function OrderDetailsPanel({
@@ -49,6 +51,7 @@ export function OrderDetailsPanel({
   refetchProductTypeNote,
   getCachedImageUrl,
   onOrderUpdate,
+  onShowProductImage,
 }: OrderDetailsPanelProps) {
   const [mockupLink, setMockupLink] = useState("")
   const [designLink, setDesignLink] = useState("")
@@ -342,6 +345,9 @@ export function OrderDetailsPanel({
         productTypeNoteError={productTypeNoteError}
         refetchProductTypeNote={refetchProductTypeNote}
         getCachedImageUrl={getCachedImageUrl}
+        // Empty note → show this order's product photo instead.
+        emptyImages={order.productImage ? [order.productImage] : []}
+        onEmptyImageClick={onShowProductImage}
       />
 
       {/* Order History */}
