@@ -1,5 +1,6 @@
 import { GoogleDriveClient } from "@/lib/google-drive-client"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
+import { isDriveUrl } from "@/lib/drive-image"
 
 // A design link cell can contain multiple URLs separated by newlines/spaces/commas,
 // and each URL can be a single Drive file or a Drive folder holding several files.
@@ -12,6 +13,13 @@ export const parseDesignLinks = (raw?: string | null): string[] => {
 }
 
 export const isDriveFolderUrl = (url: string): boolean => GoogleDriveClient.isFolderUrl(url)
+
+// CONFIRM on an order whose design links are all off Drive (e.g. the web store) skips
+// CONFIRMED and goes straight to WEB CHECKED. No design link at all keeps CONFIRMED.
+export const confirmTargetStatus = (designLink?: string | null): "CONFIRMED" | "WEB CHECKED" => {
+  const links = parseDesignLinks(designLink)
+  return links.length > 0 && !links.some(isDriveUrl) ? "WEB CHECKED" : "CONFIRMED"
+}
 
 // Cache resolved lists per raw designLink value so repeated opens don't re-hit the API
 const resolvedCache = new Map<string, Promise<string[]>>()

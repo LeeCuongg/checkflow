@@ -18,7 +18,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
-import { clearResolvedDesignLinks } from "@/utils/design-links"
+import { clearResolvedDesignLinks, confirmTargetStatus } from "@/utils/design-links"
 import { RefreshCw, Database, Sheet } from "lucide-react"
 
 type DataSource = "sheets" | "mera"
@@ -664,7 +664,7 @@ export default function ReviewPage() {
     if (dataSource === "mera") {
       // Mera: navigate ngay lập tức, PATCH chạy ngầm
       if (action === "confirm") {
-        const targetStatus: Order["status"] = "CONFIRMED"
+        const targetStatus: Order["status"] = confirmTargetStatus(currentOrder.designLink)
         if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
           handleReviewNext()
         } else {
@@ -692,7 +692,7 @@ export default function ReviewPage() {
 
     // Sheets: giữ nguyên behavior (await trước khi navigate)
     if (action === "confirm") {
-      const targetStatus: Order["status"] = "CONFIRMED"
+      const targetStatus: Order["status"] = confirmTargetStatus(currentOrder.designLink)
       const success = await updateOrderStatus(currentOrder, targetStatus, note)
       if (!success) return
     } else if (action === "need_repair") {

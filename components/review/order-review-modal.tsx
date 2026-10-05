@@ -23,6 +23,7 @@ import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
 import { refreshImages } from "@/hooks/use-image-refresh"
 import { useDesignLinks } from "@/hooks/use-design-links"
+import { confirmTargetStatus } from "@/utils/design-links"
 import { isMeraOrder, useNoNeedDesignProductTypes } from "@/hooks/use-no-need-design-product-types"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
@@ -68,10 +69,10 @@ type StatusChangeRequest =
   | { kind: "need_repair" }
   | { kind: "status"; status: Order["status"] }
 
-function statusChangeLabel(request: StatusChangeRequest): string {
+function statusChangeLabel(request: StatusChangeRequest, confirmStatus: Order["status"]): string {
   switch (request.kind) {
     case "confirm":
-      return "CONFIRMED"
+      return confirmStatus
     case "direct_repair":
       return `NEED REPAIR (${request.repairType === "design_error" ? "DESIGN ERROR" : "CUSTOMER"})`
     case "need_repair":
@@ -133,6 +134,8 @@ export function OrderReviewModal({
 
   const { preloadOrders, getCachedImageUrl } = useImageCache()
   const designUrls = useDesignLinks(order.designLink)
+  // What CONFIRM (1) sets — the parent derives the same from the design link.
+  const confirmStatus = confirmTargetStatus(order.designLink)
   const [designIndex, setDesignIndex] = useState(0)
   const mockupUrls = useDesignLinks(order.mockup)
   const [mockupIndex, setMockupIndex] = useState(0)
@@ -1045,7 +1048,7 @@ export function OrderReviewModal({
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm py-2 shadow-sm transition-all duration-200 hover:shadow-md"
                 >
                   <Check className="h-4 w-4 mr-2" />
-                  CONFIRM (1)
+                  {confirmStatus === "WEB CHECKED" ? "WEB CHECKED (1)" : "CONFIRM (1)"}
                 </Button>
               </div>
 
@@ -1295,7 +1298,7 @@ export function OrderReviewModal({
                   {pendingStatusChange && (
                     <p>
                       Trạng thái mới:{" "}
-                      <span className="font-semibold text-gray-900">{statusChangeLabel(pendingStatusChange)}</span>
+                      <span className="font-semibold text-gray-900">{statusChangeLabel(pendingStatusChange, confirmStatus)}</span>
                     </p>
                   )}
                   <p className="text-amber-800">
