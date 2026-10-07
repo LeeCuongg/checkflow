@@ -87,6 +87,8 @@ export interface MeraOrderItem {
   customer_image: string
   mockup_link: string
   source_link?: string
+  /** Shipping address lives per item in Mera (copied from the order at creation) */
+  shipping?: Partial<MeraShipping>
   tracking: MeraTracking
   designer?: MeraDesigner
   version: number

@@ -32,7 +32,7 @@ export function adaptMeraOrderWithItem(order: MeraOrder, item: MeraOrderItem): O
     productImage: item.image_link || undefined,
     productType: item.product_type || undefined,
     productName: item.product_name || undefined,
-    country: order.shipping?.country || undefined,
+    country: item.shipping?.country || order.shipping?.country || undefined,
     channel: order.channel || undefined,
     shopId: order.shop_id || undefined,
     sourceLink: item.source_link || order.source_link || undefined,
