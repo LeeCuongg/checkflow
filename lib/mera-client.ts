@@ -54,6 +54,8 @@ class MeraClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${this.apiKey}`,
+      // Mera ghi lịch sử (audit) của thay đổi này là app "checkflow" thay vì "fulfill-web".
+      "X-Trigger-Source": "checkflow",
     }
 
     if (options?.actor) {
