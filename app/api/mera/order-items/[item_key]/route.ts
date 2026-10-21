@@ -4,6 +4,7 @@ import { meraClient } from "@/lib/mera-client"
 import { createServerClient } from "@/lib/supabase"
 import { logServerError } from "@/lib/server-sentry"
 import { logMeraStatusHistory } from "@/lib/mera-history"
+import { postNeedRepairComment } from "@/lib/post-need-repair-comment"
 import type { MeraPatchItemBody } from "@/types/mera-order"
 
 type ExtendedBody = MeraPatchItemBody & {
@@ -42,6 +43,14 @@ export async function PATCH(
         orderNote: order_note ?? null,
         createdBy: appUser.sub,
       })
+      if (meraBody.status === "NEED REPAIR") {
+        await postNeedRepairComment(supabase, {
+          itemKey: data.item_key,
+          actor: { id: appUser.sub, email: appUser.email, name: appUser.name },
+          changeType: change_type,
+          note: order_note,
+        })
+      }
     }
 
     return NextResponse.json(data)

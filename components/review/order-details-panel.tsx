@@ -34,6 +34,8 @@ interface OrderDetailsPanelProps {
   onOrderUpdate?: () => void
   // Click on the product photo shown in an empty product type note (e.g. open the Product tab).
   onShowProductImage?: () => void
+  // NO NEED DESIGN order: Discussion key of its base template (shown as a second thread).
+  baseTemplateCommentKey?: string | null
 }
 
 export function OrderDetailsPanel({
@@ -52,6 +54,7 @@ export function OrderDetailsPanel({
   getCachedImageUrl,
   onOrderUpdate,
   onShowProductImage,
+  baseTemplateCommentKey,
 }: OrderDetailsPanelProps) {
   const [mockupLink, setMockupLink] = useState("")
   const [designLink, setDesignLink] = useState("")
@@ -174,6 +177,9 @@ export function OrderDetailsPanel({
     <>
       {/* Order Comments */}
       <OrderComments itemId={order.itemId} />
+      {baseTemplateCommentKey && (
+        <OrderComments itemId={baseTemplateCommentKey} title="Discussion · Base template" showPresence={false} />
+      )}
 
       {/* Order Details */}
       <div className="border-b border-gray-200">

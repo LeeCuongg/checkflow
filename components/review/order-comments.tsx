@@ -6,22 +6,27 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MessageSquare, Bell, BellOff, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
+import { MessageSquare, Bell, BellOff, ChevronDown, ChevronUp, Loader2, Wrench } from "lucide-react"
 import { useOrderComments } from "@/hooks/use-order-comments"
 import { formatDistanceToNow } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { uploadImageToS3, extractImageUrls } from "@/lib/s3-upload"
+import { parseNeedRepairComment } from "@/lib/need-repair-comment"
 import { useGlobalPresence } from "@/hooks/use-global-presence"
 import { PresenceAvatars } from "./presence-avatars"
 
 interface OrderCommentsProps {
   itemId: string
+  // Header label; a second thread on the same panel (base template) names itself here.
+  title?: string
+  // Online avatars — once per panel, so a second thread turns them off.
+  showPresence?: boolean
 }
 
-export function OrderComments({ itemId }: OrderCommentsProps) {
+export function OrderComments({ itemId, title = "Discussion", showPresence = true }: OrderCommentsProps) {
   const { user } = useAuth()
   const { comments, loading, error, submitting, postComment } = useOrderComments(itemId)
-  const { onlineUsers } = useGlobalPresence(true)
+  const { onlineUsers } = useGlobalPresence(showPresence)
   const [commentText, setCommentText] = useState("")
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -227,7 +232,7 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
               className="flex items-center gap-2 hover:bg-gray-50 rounded px-2 py-1 -ml-2 transition-colors"
             >
               <MessageSquare className="h-4 w-4 text-blue-600" />
-              <h3 className="text-sm font-semibold text-gray-900">Discussion</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
               {loading ? (
                 <span className="text-xs text-gray-400">(Loading...)</span>
               ) : comments.length > 0 ? (
@@ -241,7 +246,7 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
                 <ChevronDown className="h-4 w-4 text-gray-400" />
               )}
             </button>
-            <PresenceAvatars users={onlineUsers} label="online" maxDisplay={5} />
+            {showPresence && <PresenceAvatars users={onlineUsers} label="online" maxDisplay={5} />}
           </div>
           <Button
             variant="ghost"
@@ -266,25 +271,45 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
                   No comments yet. Start the discussion!
                 </div>
               ) : (
-                sortedComments.map((comment) => (
-                  <div key={comment.id} className="flex gap-3 bg-gray-50 rounded-lg p-3">
-                    <Avatar className="h-8 w-8 flex-shrink-0">
-                      <AvatarImage src={comment.user_avatar || undefined} alt={comment.user_name} />
-                      <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
-                        {getInitials(comment.user_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <span className="text-xs font-semibold text-gray-900">{comment.user_name}</span>
-                        <span className="text-xs text-gray-500">
-                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                        </span>
+                sortedComments.map((comment) => {
+                  // NEED REPAIR status message (posted by checkflow): drawn as a round divider —
+                  // the comments above it (newer) belong to that repair round.
+                  const repair = parseNeedRepairComment(comment.comment_text)
+                  if (repair) {
+                    return (
+                      <div key={comment.id} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-red-600" />
+                          <span className="font-semibold text-red-700">NEED REPAIR</span>
+                          {repair.title && <span className="text-red-700">· {repair.title}</span>}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-red-600/80">
+                          {comment.user_name} · {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                        </div>
+                        {repair.note && <div className="mt-1.5">{renderCommentContent(repair.note)}</div>}
                       </div>
-                      {renderCommentContent(comment.comment_text)}
+                    )
+                  }
+                  return (
+                    <div key={comment.id} className="flex gap-3 bg-gray-50 rounded-lg p-3">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={comment.user_avatar || undefined} alt={comment.user_name} />
+                        <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
+                          {getInitials(comment.user_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-xs font-semibold text-gray-900">{comment.user_name}</span>
+                          <span className="text-xs text-gray-500">
+                            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                        {renderCommentContent(comment.comment_text)}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
 

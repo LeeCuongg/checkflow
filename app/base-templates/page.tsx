@@ -15,6 +15,7 @@ import { notifyBaseTemplatesChanged } from "@/hooks/use-base-template-counts"
 import { BaseTemplateListItem } from "@/components/base-templates/base-template-list-item"
 import { BaseTemplateReviewModal } from "@/components/base-templates/base-template-review-modal"
 import { NeedRepairDialog } from "@/components/base-templates/need-repair-dialog"
+import { baseTemplateCommentKey } from "@/components/base-templates/base-template-details-panel"
 import {
   type QueueEntry,
   flattenEntries,
@@ -274,6 +275,7 @@ export default function BaseTemplatesPage() {
           product_type: pt.slug,
           design_link: variant.base_template_design,
           note,
+          comment_key: baseTemplateCommentKey(pt, variant),
         })
 
         if (!outcome.ok) {

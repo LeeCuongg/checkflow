@@ -24,6 +24,9 @@ export interface NoNeedDesignProductType {
   projectId: string
   slug: string
   displayName: string
+  // product_type_versions._id — part of the base template Discussion key.
+  productTypeId: string
+  variants: { variantKey: string; design: string }[]
 }
 
 interface StoreState {
@@ -85,6 +88,11 @@ async function fetchAll(token: string) {
         projectId: pt.project_id,
         slug: pt.slug,
         displayName: pt.display_name || pt.slug,
+        productTypeId: pt.product_type_id,
+        variants: (pt.variants ?? []).map((v) => ({
+          variantKey: v.variant_key,
+          design: (v.base_template_design || "").trim(),
+        })),
       })
     }
     totalPages = data.total_pages ?? 1
@@ -133,6 +141,22 @@ export function findNoNeedDesignProductType(
   const projectId = (order as MaybeMeraOrder)._mera?.project_id
   if (!projectId) return null
   return byKey.get(noNeedDesignKey(projectId, order.productType)) ?? null
+}
+
+// Discussion key of the base template an order is fulfilled from — the SAME key as
+// baseTemplateCommentKey on /base-templates (bt:{project}:{product_type_id}:{variant_key}).
+// An order belongs to the variant whose base_template_design is the order's design link (how
+// Mera groups waiting orders); a single-variant product type needs no match. null = unknown.
+export function baseTemplateCommentKeyForOrder(
+  pt: NoNeedDesignProductType | null,
+  order: Order | null | undefined
+): string | null {
+  if (!pt || !order) return null
+  const design = (order.designLink || "").trim()
+  const variant =
+    (design && pt.variants.find((v) => v.design === design)) || (pt.variants.length === 1 ? pt.variants[0] : null)
+  if (!variant) return null
+  return `bt:${pt.projectId}:${pt.productTypeId || pt.slug}:${variant.variantKey}`
 }
 
 export function useNoNeedDesignProductTypes({ enabled = true }: { enabled?: boolean } = {}) {

@@ -148,6 +148,8 @@ export interface CheckflowBaseTemplateConfirmRequest extends BaseTemplateConfirm
 
 export interface CheckflowBaseTemplateNeedRepairRequest extends BaseTemplateNeedRepairBody {
   project_id: string
+  // Discussion key of the variant (baseTemplateCommentKey) — checkflow-only, not sent to Mera.
+  comment_key?: string
 }
 
 // ── GET /api/v1/base-template-settings ──

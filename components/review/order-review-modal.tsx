@@ -24,7 +24,11 @@ import { useImageCache } from "@/hooks/use-image-cache"
 import { refreshImages } from "@/hooks/use-image-refresh"
 import { useDesignLinks } from "@/hooks/use-design-links"
 import { confirmTargetStatus } from "@/utils/design-links"
-import { isMeraOrder, useNoNeedDesignProductTypes } from "@/hooks/use-no-need-design-product-types"
+import {
+  baseTemplateCommentKeyForOrder,
+  isMeraOrder,
+  useNoNeedDesignProductTypes,
+} from "@/hooks/use-no-need-design-product-types"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
   X,
@@ -1254,6 +1258,7 @@ export function OrderReviewModal({
 
             <OrderDetailsPanel
               order={order}
+              baseTemplateCommentKey={baseTemplateCommentKeyForOrder(noNeedDesignProductType, order)}
               currentStatus={currentStatus}
               orderHistoryData={orderHistoryData}
               orderHistoryLoading={orderHistoryLoading}
