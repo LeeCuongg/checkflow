@@ -44,11 +44,11 @@ export async function PATCH(
         createdBy: appUser.sub,
       })
       if (meraBody.status === "NEED REPAIR") {
+        // Marker only: order_note is support's note on the order, not the reason for this repair.
         await postNeedRepairComment(supabase, {
           itemKey: data.item_key,
           actor: { id: appUser.sub, email: appUser.email, name: appUser.name },
           changeType: change_type,
-          note: order_note,
         })
       }
     }

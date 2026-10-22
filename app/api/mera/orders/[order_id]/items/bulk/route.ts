@@ -49,6 +49,7 @@ export async function PATCH(
         )
       )
       if (newStatus === "NEED REPAIR") {
+        // Marker only: order_note is support's note on the order, not the reason for this repair.
         await Promise.all(
           (data.items ?? [])
             .filter((item) => meraBody.item_keys.includes(item.item_key))
@@ -57,7 +58,6 @@ export async function PATCH(
                 itemKey: item.item_key,
                 actor: { id: appUser.sub, email: appUser.email, name: appUser.name },
                 changeType: change_type,
-                note: order_note,
               })
             )
         )
