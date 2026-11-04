@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import { clearResolvedDesignLinks, confirmTargetStatus } from "@/utils/design-links"
+import { applyLargeOrderRule } from "@/utils/large-order"
 import { RefreshCw, Database, Sheet } from "lucide-react"
 
 type DataSource = "sheets" | "mera"
@@ -664,7 +665,7 @@ export default function ReviewPage() {
     if (dataSource === "mera") {
       // Mera: navigate ngay lập tức, PATCH chạy ngầm
       if (action === "confirm") {
-        const targetStatus: Order["status"] = confirmTargetStatus(currentOrder.designLink)
+        const targetStatus = applyLargeOrderRule(currentOrder, confirmTargetStatus(currentOrder.designLink))
         if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
           handleReviewNext()
         } else {
@@ -692,7 +693,7 @@ export default function ReviewPage() {
 
     // Sheets: giữ nguyên behavior (await trước khi navigate)
     if (action === "confirm") {
-      const targetStatus: Order["status"] = confirmTargetStatus(currentOrder.designLink)
+      const targetStatus = applyLargeOrderRule(currentOrder, confirmTargetStatus(currentOrder.designLink))
       const success = await updateOrderStatus(currentOrder, targetStatus, note)
       if (!success) return
     } else if (action === "need_repair") {
@@ -717,6 +718,7 @@ export default function ReviewPage() {
     if (!reviewMode) return
 
     const currentOrder = reviewMode.orders[reviewMode.currentIndex]
+    newStatus = applyLargeOrderRule(currentOrder, newStatus)
 
     const success = dataSource === "mera"
       ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, newStatus, note, changeType)

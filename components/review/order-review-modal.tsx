@@ -24,6 +24,7 @@ import { useImageCache } from "@/hooks/use-image-cache"
 import { refreshImages } from "@/hooks/use-image-refresh"
 import { useDesignLinks } from "@/hooks/use-design-links"
 import { confirmTargetStatus } from "@/utils/design-links"
+import { applyLargeOrderRule } from "@/utils/large-order"
 import {
   baseTemplateCommentKeyForOrder,
   isMeraOrder,
@@ -138,8 +139,8 @@ export function OrderReviewModal({
 
   const { preloadOrders, getCachedImageUrl } = useImageCache()
   const designUrls = useDesignLinks(order.designLink)
-  // What CONFIRM (1) sets — the parent derives the same from the design link.
-  const confirmStatus = confirmTargetStatus(order.designLink)
+  // What CONFIRM (1) sets — the parent derives the same from the design link and order size.
+  const confirmStatus = applyLargeOrderRule(order, confirmTargetStatus(order.designLink))
   const [designIndex, setDesignIndex] = useState(0)
   const mockupUrls = useDesignLinks(order.mockup)
   const [mockupIndex, setMockupIndex] = useState(0)
@@ -1052,7 +1053,7 @@ export function OrderReviewModal({
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm py-2 shadow-sm transition-all duration-200 hover:shadow-md"
                 >
                   <Check className="h-4 w-4 mr-2" />
-                  {confirmStatus === "WEB CHECKED" ? "WEB CHECKED (1)" : "CONFIRM (1)"}
+                  {confirmStatus === "CONFIRMED" ? "CONFIRM (1)" : `${confirmStatus} (1)`}
                 </Button>
               </div>
 
