@@ -6,7 +6,7 @@ export interface OrderReviewModalProps {
   onClose: () => void
   order: Order
   onAction: (
-    action: "confirm" | "need_repair" | "skip",
+    action: "confirm" | "send_mockup" | "need_repair" | "skip",
     repairType?: "design_error" | "customer_change",
     note?: string,
   ) => void

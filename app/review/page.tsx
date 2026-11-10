@@ -654,7 +654,7 @@ export default function ReviewPage() {
   }
 
   const handleReviewAction = async (
-    action: "confirm" | "need_repair" | "skip",
+    action: "confirm" | "send_mockup" | "need_repair" | "skip",
     repairType?: "design_error" | "customer_change",
     note?: string,
   ) => {
@@ -664,8 +664,11 @@ export default function ReviewPage() {
 
     if (dataSource === "mera") {
       // Mera: navigate ngay lập tức, PATCH chạy ngầm
-      if (action === "confirm") {
-        const targetStatus = applyLargeOrderRule(currentOrder, confirmTargetStatus(currentOrder.designLink))
+      if (action === "confirm" || action === "send_mockup") {
+        const targetStatus: Order["status"] =
+          action === "send_mockup"
+            ? "SEND MOCKUP"
+            : applyLargeOrderRule(currentOrder, confirmTargetStatus(currentOrder.designLink))
         if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
           handleReviewNext()
         } else {
@@ -692,8 +695,11 @@ export default function ReviewPage() {
     }
 
     // Sheets: giữ nguyên behavior (await trước khi navigate)
-    if (action === "confirm") {
-      const targetStatus = applyLargeOrderRule(currentOrder, confirmTargetStatus(currentOrder.designLink))
+    if (action === "confirm" || action === "send_mockup") {
+      const targetStatus: Order["status"] =
+        action === "send_mockup"
+          ? "SEND MOCKUP"
+          : applyLargeOrderRule(currentOrder, confirmTargetStatus(currentOrder.designLink))
       const success = await updateOrderStatus(currentOrder, targetStatus, note)
       if (!success) return
     } else if (action === "need_repair") {

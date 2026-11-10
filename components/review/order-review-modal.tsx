@@ -36,6 +36,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  Send,
   AlertTriangle,
   Maximize,
   Copy,
@@ -70,6 +71,7 @@ import { copyVisibleImageToClipboard } from "@/utils/screenshot"
 // A status change requested from the modal (see requestStatusChange).
 type StatusChangeRequest =
   | { kind: "confirm" }
+  | { kind: "send_mockup" }
   | { kind: "direct_repair"; repairType: "design_error" | "customer_change" }
   | { kind: "need_repair" }
   | { kind: "status"; status: Order["status"] }
@@ -78,6 +80,8 @@ function statusChangeLabel(request: StatusChangeRequest, confirmStatus: Order["s
   switch (request.kind) {
     case "confirm":
       return confirmStatus
+    case "send_mockup":
+      return "SEND MOCKUP"
     case "direct_repair":
       return `NEED REPAIR (${request.repairType === "design_error" ? "DESIGN ERROR" : "CUSTOMER"})`
     case "need_repair":
@@ -416,6 +420,17 @@ export function OrderReviewModal({
     onAction("confirm", undefined, noteToSend)
   }
 
+  const handleSendMockup = () => {
+    requestStatusChange({ kind: "send_mockup" })
+  }
+
+  const doSendMockup = () => {
+    const currentNoteValue = orderNoteTextareaRef.current?.value || ""
+    const noteChanged = currentNoteValue !== (order.orderNote || "")
+    const noteToSend = noteChanged ? currentNoteValue : order.orderNote
+    onAction("send_mockup", undefined, noteToSend)
+  }
+
   const handleCopyItemId = async () => {
     try {
       await navigator.clipboard.writeText(order.itemId)
@@ -577,6 +592,9 @@ export function OrderReviewModal({
     switch (request.kind) {
       case "confirm":
         doConfirm()
+        break
+      case "send_mockup":
+        doSendMockup()
         break
       case "direct_repair":
         doDirectRepair(request.repairType)
@@ -1055,6 +1073,16 @@ export function OrderReviewModal({
                   <Check className="h-4 w-4 mr-2" />
                   {confirmStatus === "CONFIRMED" ? "CONFIRM (1)" : `${confirmStatus} (1)`}
                 </Button>
+                {/* Đơn lớn: CONFIRM đã ra SEND MOCKUP nên không cần nút riêng */}
+                {confirmStatus !== "SEND MOCKUP" && (
+                  <Button
+                    onClick={handleSendMockup}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 shadow-sm transition-all duration-200 hover:shadow-md"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    SEND MOCKUP
+                  </Button>
+                )}
               </div>
 
               {/* Order Note Section */}
