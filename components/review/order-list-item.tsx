@@ -309,6 +309,8 @@ export function OrderListItem({ order }: OrderListItemProps) {
                     src={order.productImage}
                     alt="Product"
                     className="w-full h-20 rounded-lg border border-gray-200 group-hover/img:border-gray-300 transition-colors cursor-pointer"
+                    previewSize={400}
+                    fullSize={400}
                     fallbackSrc="/placeholder.svg?height=80&width=80&text=Product"
                     onClick={() => window.open(order.productImage, "_blank")}
                   />
@@ -327,6 +329,8 @@ export function OrderListItem({ order }: OrderListItemProps) {
                     src={order.customerImage}
                     alt="Customer Reference"
                     className="w-full h-20 rounded-lg border border-gray-200 group-hover/img:border-gray-300 transition-colors cursor-pointer"
+                    previewSize={400}
+                    fullSize={400}
                     fallbackSrc="/placeholder.svg?height=80&width=80&text=Customer"
                     onClick={() => window.open(order.customerImage, "_blank")}
                   />

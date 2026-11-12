@@ -7,7 +7,9 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 const FILE_ID_PATTERN = /^[a-zA-Z0-9_-]{8,}$/
-const ALLOWED_SIZES = [400, 800, 1600, 2560, 4096]
+// 200 = the small thumbnails (list rows, sample-order chips) — without it those requests 400
+// and LazyImage burns its retries (re-minting the image token) before falling back.
+const ALLOWED_SIZES = [200, 400, 800, 1600, 2560, 4096]
 
 // Bytes for a given (fileId, size) never change, and the token in the URL keeps the
 // cache entry scoped to one user — so the browser may keep it indefinitely.

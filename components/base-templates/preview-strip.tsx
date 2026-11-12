@@ -98,6 +98,11 @@ export function PreviewStrip({
               src={t.url}
               alt={t.label}
               className="w-full h-20 rounded-lg border border-gray-200 hover:border-gray-300"
+              // An 80px-tall tile: without these the LazyImage defaults (1600 preview → 4096
+              // "full") download every row's design/mockup at full size — 2–14 MB each on the
+              // big all-over-print templates (CO projects), which made the page crawl.
+              previewSize={400}
+              fullSize={400}
               fallbackSrc={`/placeholder.svg?height=80&width=80&text=${t.label}`}
             />
             <span className="absolute bottom-1 left-1 text-xs bg-black bg-opacity-75 text-white px-1.5 py-0.5 rounded">
