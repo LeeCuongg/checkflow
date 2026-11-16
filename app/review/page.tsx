@@ -14,7 +14,7 @@ import { SyncStatusIndicator } from "@/components/sync-status-indicator"
 import { BaseTemplateStatsCard } from "@/components/base-templates/base-template-stats-card"
 import type { Order } from "@/types/order"
 import type { MeraOrder, MeraListOrdersParams } from "@/types/mera-order"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
@@ -41,8 +41,50 @@ export default function ReviewPage() {
   // ── Source toggle ──────────────────────────────────────────────────────────
   const [dataSource, setDataSource] = useState<DataSource>("mera")
 
+  // ── Sheets state (also owns the shared filter state used by Mera) ─────────
+  const {
+    orders,
+    allOrders, // Added allOrders to get all orders regardless of pagination
+    sheets,
+    selectedSheet,
+    loading,
+    error,
+    totalCount,
+    filteredCount,
+    filters,
+    filterOptions,
+    lastSync,
+    loadingTime,
+    pagination,
+    syncStatus,
+    syncError,
+    pendingChanges,
+    triggerManualSync,
+    loadOrdersFromSheet,
+    applyFilters,
+    refreshData,
+    changePageSize,
+    changePage,
+    updateOrderStatus,
+    reloadOrderFromSheet, // Import the new reload function
+  } = useOrderData({ enabled: dataSource === "sheets" })
+
   // ── Mera state ────────────────────────────────────────────────────────────
   const [meraProjectId, setMeraProjectId] = useState<string>("")
+  // Status filter must run on the server: the list is paginated, so filtering only the
+  // loaded page hides matching orders that live on other pages (badge says 2, list says 0).
+  const meraStatuses = useMemo(() => {
+    if (!filters.status?.length) return undefined
+    const out = new Set<string>()
+    filters.status.forEach((s) => {
+      out.add(s)
+      // CheckFlow shows "NEED REPAIR"; Mera may store it as NEED_REPAIR
+      if (s === "NEED REPAIR") out.add("NEED_REPAIR")
+    })
+    return [...out]
+  }, [filters.status])
+  const meraStatusKey = meraStatuses?.join(",") ?? ""
+  const prevMeraStatusKey = useRef(meraStatusKey)
   const [meraParams, setMeraParams] = useState<MeraListOrdersParams>({
     page: 1,
     page_size: 500,
@@ -60,9 +102,17 @@ export default function ReviewPage() {
     error: meraError,
     refetch: meraRefetch,
   } = useMeraOrders(
-    dataSource === "mera" ? { ...meraParams, project_id: meraProjectId || undefined } : { page: 1, page_size: 1 },
+    dataSource === "mera"
+      ? { ...meraParams, statuses: meraStatuses, project_id: meraProjectId || undefined }
+      : { page: 1, page_size: 1 },
     { enabled: dataSource === "mera" }
   )
+  // Back to page 1 whenever the status filter changes (the old page may not exist anymore)
+  useEffect(() => {
+    if (prevMeraStatusKey.current === meraStatusKey) return
+    prevMeraStatusKey.current = meraStatusKey
+    setMeraParams((p) => (p.page === 1 ? p : { ...p, page: 1 }))
+  }, [meraStatusKey])
   const { patchItem: meraPatchItem } = useMeraMutations()
 
   const meraOrders = useMemo(
@@ -98,34 +148,6 @@ export default function ReviewPage() {
     meraOrders.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1 })
     return counts
   }, [dataSource, meraOrders, meraStatusCounts])
-
-  // ── Sheets state ──────────────────────────────────────────────────────────
-  const {
-    orders,
-    allOrders, // Added allOrders to get all orders regardless of pagination
-    sheets,
-    selectedSheet,
-    loading,
-    error,
-    totalCount,
-    filteredCount,
-    filters,
-    filterOptions,
-    lastSync,
-    loadingTime,
-    pagination,
-    syncStatus,
-    syncError,
-    pendingChanges,
-    triggerManualSync,
-    loadOrdersFromSheet,
-    applyFilters,
-    refreshData,
-    changePageSize,
-    changePage,
-    updateOrderStatus,
-    reloadOrderFromSheet, // Import the new reload function
-  } = useOrderData({ enabled: dataSource === "sheets" })
 
   const meraDerivedFilteredCounts = useMemo(() => {
     const designerCounts: Record<string, number> = {}
