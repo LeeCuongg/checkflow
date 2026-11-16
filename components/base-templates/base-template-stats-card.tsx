@@ -9,8 +9,7 @@ import { useBaseTemplateCounts } from "@/hooks/use-base-template-counts"
 // the sidebar badges.
 export function BaseTemplateStatsCard() {
   const { counts, loading, error, refresh } = useBaseTemplateCounts()
-  const plus = counts?.partial ? "+" : ""
-  const value = (n: number | undefined) => (n === undefined ? "—" : `${n.toLocaleString()}${plus}`)
+  const value = (n: number | undefined) => (n === undefined ? "—" : n.toLocaleString())
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
