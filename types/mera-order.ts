@@ -118,7 +118,38 @@ export interface MeraListOrdersParams {
   date_from?: string
   /** Format YYYY-MM-DD */
   date_to?: string
+  /** Multi-value filters applied by Mera across ALL pages, keyed by column id (MeraFacetField). */
+  column_filters?: Record<string, MeraColumnFilter>
 }
+
+/** One column's selection: the values ticked, plus whether blank counts as a match. */
+export interface MeraColumnFilter {
+  values: string[]
+  include_empty: boolean
+}
+
+/** Columns whose filter options Order Review asks Mera for (POST /api/v2/orders/facet-values). */
+export const MERA_FACET_FIELDS = ["designer", "product_type", "store"] as const
+export type MeraFacetField = (typeof MERA_FACET_FIELDS)[number]
+
+/** The filters a facet list is computed under — the same ones the order list is using. */
+export interface MeraFacetFilters {
+  project_id?: string
+  q?: string
+  statuses?: string[]
+  column_filters?: Record<string, MeraColumnFilter>
+}
+
+/** Distinct values of one column under the current filters (its own selection is ignored). */
+export interface MeraFacetResult {
+  field: string
+  values: string[]
+  has_empty: boolean
+  /** Mera caps a list at 1000 values */
+  truncated: boolean
+}
+
+export type MeraFacets = Partial<Record<MeraFacetField, MeraFacetResult>>
 
 export interface MeraListOrdersResponse {
   orders: MeraOrder[]

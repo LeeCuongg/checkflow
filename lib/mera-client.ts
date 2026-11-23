@@ -3,6 +3,9 @@ import { logServerError } from "@/lib/server-sentry"
 import type {
   MeraActor,
   MeraBulkPatchItemsBody,
+  MeraFacetField,
+  MeraFacetFilters,
+  MeraFacetResult,
   MeraListOrdersParams,
   MeraListOrdersResponse,
   MeraOrder,
@@ -118,6 +121,9 @@ class MeraClient {
         url.searchParams.append("statuses", s)
       }
     }
+    if (params.column_filters && Object.keys(params.column_filters).length > 0) {
+      url.searchParams.set("column_filters", JSON.stringify(params.column_filters))
+    }
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -134,6 +140,18 @@ class MeraClient {
       throw err
     }
     return res.json() as Promise<MeraListOrdersResponse>
+  }
+
+  // Distinct values of one column across every order matching `filters` (not just one page).
+  async getOrderFacetValues(
+    actor: MeraActor,
+    field: MeraFacetField,
+    filters: MeraFacetFilters
+  ): Promise<MeraFacetResult> {
+    return this.request<MeraFacetResult>("POST", "/api/v2/orders/facet-values", {
+      actor,
+      body: { field, ...filters },
+    })
   }
 
   async patchOrder(actor: MeraActor, orderId: string, body: MeraPatchOrderBody): Promise<MeraOrder> {

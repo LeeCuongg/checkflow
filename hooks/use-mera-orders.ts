@@ -31,6 +31,11 @@ export function useMeraOrders(params: MeraListOrdersParams, options?: { enabled?
   const { user, getToken } = useAuth()
   const paramsRef = useRef(params)
   paramsRef.current = params
+  const requestSeq = useRef(0)
+  const columnFiltersKey =
+    params.column_filters && Object.keys(params.column_filters).length > 0
+      ? JSON.stringify(params.column_filters)
+      : ""
 
   const fetchOrders = useCallback(async () => {
     const token = getToken()
@@ -38,6 +43,9 @@ export function useMeraOrders(params: MeraListOrdersParams, options?: { enabled?
       setLoading(false)
       return
     }
+    // Filters change while the user types: only the newest request may write its answer,
+    // or a slow older one would put back the list of a previous search.
+    const seq = ++requestSeq.current
 
     try {
       setLoading(true)
@@ -56,6 +64,9 @@ export function useMeraOrders(params: MeraListOrdersParams, options?: { enabled?
       if (p.project_id) sp.set("project_id", p.project_id)
       if (p.q) sp.set("q", p.q)
       if (p.include_items) sp.set("include_items", "true")
+      if (p.column_filters && Object.keys(p.column_filters).length > 0) {
+        sp.set("column_filters", JSON.stringify(p.column_filters))
+      }
 
       const res = await fetch(`/api/mera/orders?${sp.toString()}`, {
         headers: {
@@ -70,13 +81,15 @@ export function useMeraOrders(params: MeraListOrdersParams, options?: { enabled?
       }
 
       const data: MeraListOrdersResponse = await res.json()
+      if (seq !== requestSeq.current) return
       setResult(data)
     } catch (err) {
+      if (seq !== requestSeq.current) return
       const message = err instanceof Error ? err.message : "Failed to load orders"
       setError(message)
       logError(err as Error, { context: "useMeraOrders" })
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
   }, [user, getToken])
 
@@ -98,6 +111,7 @@ export function useMeraOrders(params: MeraListOrdersParams, options?: { enabled?
     params.designer,
     params.q,
     params.include_items,
+    columnFiltersKey,
   ])
 
   return { ...result, status_counts: result.status_counts ?? {}, loading, error, refetch: fetchOrders }

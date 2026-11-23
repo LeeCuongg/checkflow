@@ -34,6 +34,12 @@ interface OrderListHeaderProps {
   designerCounts?: Record<string, number>
   productTypeCounts?: Record<string, number>
   storeCounts?: Record<string, number>
+  /**
+   * false = the designer / product type / store options are complete lists with no counts
+   * (Mera: they cover every page, and a count is only known for the loaded page).
+   */
+  showFacetCounts?: boolean
+  searchPlaceholder?: string
   syncStatus?: "idle" | "syncing" | "success" | "error"
   pendingChanges?: number
   syncError?: string | null
@@ -57,6 +63,8 @@ export function OrderListHeader({
   designerCounts = {},
   productTypeCounts = {},
   storeCounts = {},
+  showFacetCounts = true,
+  searchPlaceholder = "Search orders by ID, note, personalization, product, designer, or store...",
   syncStatus = "idle",
   pendingChanges = 0,
   syncError,
@@ -203,7 +211,7 @@ export function OrderListHeader({
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search orders by ID, note, personalization, product, designer, or store..."
+              placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -426,9 +434,9 @@ export function OrderListHeader({
               {/* Designer Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Designer</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[28rem] overflow-y-auto">
                   {filterOptions.designers
-                    .filter((designer) => (designerCounts[designer] || 0) > 0)
+                    .filter((designer) => !showFacetCounts || (designerCounts[designer] || 0) > 0)
                     .sort((a, b) => {
                       if (a === "[Blank]") return -1
                       if (b === "[Blank]") return 1
@@ -459,9 +467,11 @@ export function OrderListHeader({
                             {designer === "[Blank]" ? "(No Designer)" : designer}
                           </span>
                         </div>
-                        <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-200">
-                          {designerCounts[designer]}
-                        </Badge>
+                        {showFacetCounts && (
+                          <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-200">
+                            {designerCounts[designer]}
+                          </Badge>
+                        )}
                       </label>
                     ))}
                 </div>
@@ -470,9 +480,9 @@ export function OrderListHeader({
               {/* Product Type Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Product Type</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[28rem] overflow-y-auto">
                   {filterOptions.productTypes
-                    .filter((type) => (productTypeCounts[type] || 0) > 0)
+                    .filter((type) => !showFacetCounts || (productTypeCounts[type] || 0) > 0)
                     .sort((a, b) => a.localeCompare(b))
                     .map((type) => (
                       <label
@@ -494,9 +504,11 @@ export function OrderListHeader({
                           />
                           <span className="text-sm text-gray-700">{type}</span>
                         </div>
-                        <Badge className="text-xs px-2 py-1 bg-purple-100 text-purple-700 border-purple-200">
-                          {productTypeCounts[type]}
-                        </Badge>
+                        {showFacetCounts && (
+                          <Badge className="text-xs px-2 py-1 bg-purple-100 text-purple-700 border-purple-200">
+                            {productTypeCounts[type]}
+                          </Badge>
+                        )}
                       </label>
                     ))}
                 </div>
@@ -505,9 +517,9 @@ export function OrderListHeader({
               {/* Store Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Store</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[28rem] overflow-y-auto">
                   {filterOptions.stores
-                    .filter((store) => (storeCounts[store] || 0) > 0)
+                    .filter((store) => !showFacetCounts || (storeCounts[store] || 0) > 0)
                     .sort((a, b) => a.localeCompare(b))
                     .map((store) => (
                       <label
@@ -529,9 +541,11 @@ export function OrderListHeader({
                           />
                           <span className="text-sm text-gray-700">{store}</span>
                         </div>
-                        <Badge className="text-xs px-2 py-1 bg-orange-100 text-orange-700 border-orange-200">
-                          {storeCounts[store]}
-                        </Badge>
+                        {showFacetCounts && (
+                          <Badge className="text-xs px-2 py-1 bg-orange-100 text-orange-700 border-orange-200">
+                            {storeCounts[store]}
+                          </Badge>
+                        )}
                       </label>
                     ))}
                 </div>

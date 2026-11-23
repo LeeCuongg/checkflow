@@ -73,25 +73,22 @@ const adminItems = []
 function BaseTemplateNavBadges() {
   const { counts } = useBaseTemplateCounts()
   if (!counts) return null
-  const plus = counts.partial ? "+" : ""
   return (
     <span className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
       {counts.waiting > 0 && (
         <span
-          title={`${counts.waiting}${plus} template chờ duyệt đang có đơn`}
+          title={`${counts.waiting} template chờ duyệt đang có đơn`}
           className="min-w-5 h-5 px-1.5 rounded-full bg-amber-400 text-amber-950 text-xs font-semibold tabular-nums flex items-center justify-center"
         >
           {counts.waiting}
-          {plus}
         </span>
       )}
       {counts.repair > 0 && (
         <span
-          title={`${counts.repair}${plus} template chờ designer sửa`}
+          title={`${counts.repair} template chờ designer sửa`}
           className="min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold tabular-nums flex items-center justify-center"
         >
           {counts.repair}
-          {plus}
         </span>
       )}
     </span>

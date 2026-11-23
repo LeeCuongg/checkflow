@@ -13,8 +13,9 @@ import { OrderList } from "@/components/review/order-list"
 import { SyncStatusIndicator } from "@/components/sync-status-indicator"
 import { BaseTemplateStatsCard } from "@/components/base-templates/base-template-stats-card"
 import type { Order } from "@/types/order"
-import type { MeraOrder, MeraListOrdersParams } from "@/types/mera-order"
-import { useState, useEffect, useMemo, useRef } from "react"
+import type { MeraOrder, MeraListOrdersParams, MeraColumnFilter, MeraFacetFilters } from "@/types/mera-order"
+import { useMeraOrderFacets } from "@/hooks/use-mera-order-facets"
+import { useState, useEffect, useMemo } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
@@ -84,11 +85,55 @@ export default function ReviewPage() {
     return [...out]
   }, [filters.status])
   const meraStatusKey = meraStatuses?.join(",") ?? ""
-  const prevMeraStatusKey = useRef(meraStatusKey)
+  // Search and the designer / product type / store ticks run on the server for the same
+  // reason: the user cannot know which page an order is on, so a search or a tick must
+  // look through every page.
+  const [meraSearch, setMeraSearch] = useState((filters.searchQuery ?? "").trim())
+  useEffect(() => {
+    const next = (filters.searchQuery ?? "").trim()
+    // Wait for a pause in typing instead of asking Mera on every keystroke
+    const timer = setTimeout(() => setMeraSearch(next), 350)
+    return () => clearTimeout(timer)
+  }, [filters.searchQuery])
+  const meraSearchPending = (filters.searchQuery ?? "").trim() !== meraSearch
+  const meraColumnFilters = useMemo(() => {
+    const out: Record<string, MeraColumnFilter> = {}
+    if (filters.designer?.length) {
+      out.designer = {
+        values: filters.designer.filter((d) => d !== "[Blank]"),
+        include_empty: filters.designer.includes("[Blank]"),
+      }
+    }
+    if (filters.productType?.length) out.product_type = { values: filters.productType, include_empty: false }
+    if (filters.store?.length) out.store = { values: filters.store, include_empty: false }
+    return Object.keys(out).length > 0 ? out : undefined
+  }, [filters.designer, filters.productType, filters.store])
   const [meraParams, setMeraParams] = useState<MeraListOrdersParams>({
-    page: 1,
     page_size: 500,
     include_items: true,
+  })
+  // The page number belongs to one set of filters: once any of them changes, that page may
+  // not exist anymore, so the list starts again from page 1.
+  const meraFilterKey = [
+    meraProjectId,
+    meraStatusKey,
+    meraSearch,
+    meraColumnFilters ? JSON.stringify(meraColumnFilters) : "",
+    meraParams.page_size,
+  ].join("|")
+  const [meraPageState, setMeraPageState] = useState({ page: 1, key: meraFilterKey })
+  const meraPageNumber = meraPageState.key === meraFilterKey ? meraPageState.page : 1
+  const meraFacetFilters = useMemo<MeraFacetFilters>(
+    () => ({
+      project_id: meraProjectId || undefined,
+      q: meraSearch || undefined,
+      statuses: meraStatuses,
+      column_filters: meraColumnFilters,
+    }),
+    [meraProjectId, meraSearch, meraStatuses, meraColumnFilters]
+  )
+  const { facets: meraFacets, refetch: meraFacetsRefetch } = useMeraOrderFacets(meraFacetFilters, {
+    enabled: dataSource === "mera",
   })
   const { projects: meraProjects, loading: meraProjectsLoading } = useMeraProjects({ enabled: dataSource === "mera" })
   const {
@@ -103,16 +148,17 @@ export default function ReviewPage() {
     refetch: meraRefetch,
   } = useMeraOrders(
     dataSource === "mera"
-      ? { ...meraParams, statuses: meraStatuses, project_id: meraProjectId || undefined }
+      ? {
+          ...meraParams,
+          page: meraPageNumber,
+          statuses: meraStatuses,
+          q: meraSearch || undefined,
+          column_filters: meraColumnFilters,
+          project_id: meraProjectId || undefined,
+        }
       : { page: 1, page_size: 1 },
     { enabled: dataSource === "mera" }
   )
-  // Back to page 1 whenever the status filter changes (the old page may not exist anymore)
-  useEffect(() => {
-    if (prevMeraStatusKey.current === meraStatusKey) return
-    prevMeraStatusKey.current = meraStatusKey
-    setMeraParams((p) => (p.page === 1 ? p : { ...p, page: 1 }))
-  }, [meraStatusKey])
   const { patchItem: meraPatchItem } = useMeraMutations()
 
   const meraOrders = useMemo(
@@ -120,7 +166,9 @@ export default function ReviewPage() {
     [dataSource, rawMeraOrders]
   )
 
-  // ── Mera filter options (derived from current page of mera orders) ────────
+  // ── Mera filter options ───────────────────────────────────────────────────
+  // Designer / product type / store come from Mera (every order matching the other filters).
+  // Until that answer arrives — or if it fails — fall back to what the loaded page holds.
   const meraFilterOptions = useMemo(() => {
     if (dataSource !== "mera") return { statuses: [], designers: [], productTypes: [], stores: [] }
     const statuses = [...new Set(meraOrders.map((o) => o.status))]
@@ -128,17 +176,28 @@ export default function ReviewPage() {
     Object.keys(meraStatusCounts).forEach((s) => {
       if (!statuses.includes(s)) statuses.push(s)
     })
+    // A ticked value always stays in the list, so it can be unticked
+    const withSelected = (values: string[], selected?: string[]) => [...new Set([...values, ...(selected ?? [])])]
+
     const allDesigners = meraOrders.map((o) => o.designer)
-    const hasBlank = allDesigners.some((d) => !d || d.trim() === "")
-    const nonBlank = [...new Set(allDesigners.filter((d): d is string => !!d && d.trim() !== ""))]
-    const designers = hasBlank ? ["[Blank]", ...nonBlank] : nonBlank
+    const designers = meraFacets?.designer
+      ? [...(meraFacets.designer.has_empty ? ["[Blank]"] : []), ...meraFacets.designer.values]
+      : [
+          ...(allDesigners.some((d) => !d || d.trim() === "") ? ["[Blank]"] : []),
+          ...new Set(allDesigners.filter((d): d is string => !!d && d.trim() !== "")),
+        ]
+    const productTypes =
+      meraFacets?.product_type?.values ??
+      ([...new Set(meraOrders.map((o) => o.productType).filter(Boolean))] as string[])
+    const stores =
+      meraFacets?.store?.values ?? ([...new Set(meraOrders.map((o) => o.store).filter(Boolean))] as string[])
     return {
       statuses,
-      designers,
-      productTypes: [...new Set(meraOrders.map((o) => o.productType).filter(Boolean))] as string[],
-      stores: [...new Set(meraOrders.map((o) => o.store).filter(Boolean))] as string[],
+      designers: withSelected(designers, filters.designer),
+      productTypes: withSelected(productTypes, filters.productType),
+      stores: withSelected(stores, filters.store),
     }
-  }, [dataSource, meraOrders, meraStatusCounts])
+  }, [dataSource, meraOrders, meraStatusCounts, meraFacets, filters.designer, filters.productType, filters.store])
 
   const meraDerivedStatusCounts = useMemo(() => {
     if (dataSource !== "mera") return {}
@@ -148,51 +207,6 @@ export default function ReviewPage() {
     meraOrders.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1 })
     return counts
   }, [dataSource, meraOrders, meraStatusCounts])
-
-  const meraDerivedFilteredCounts = useMemo(() => {
-    const designerCounts: Record<string, number> = {}
-    const productTypeCounts: Record<string, number> = {}
-    const storeCounts: Record<string, number> = {}
-    if (dataSource !== "mera") return { designerCounts, productTypeCounts, storeCounts }
-
-    const matchesDesigner = (o: Order) => {
-      if (!filters.designer?.length) return true
-      const hasBlank = filters.designer.includes("[Blank]")
-      const others = filters.designer.filter((d) => d !== "[Blank]")
-      const isBlank = !o.designer || o.designer.trim() === ""
-      return isBlank ? hasBlank : others.includes(o.designer!)
-    }
-
-    // Designer counts: apply status + productType + store filters (NOT designer)
-    meraOrders.forEach((o) => {
-      if (filters.status?.length && !filters.status.includes(o.status)) return
-      if (filters.productType?.length && !filters.productType.includes(o.productType!)) return
-      if (filters.store?.length && !filters.store.includes(o.store!)) return
-      if (o.designer && o.designer.trim() !== "") {
-        designerCounts[o.designer] = (designerCounts[o.designer] || 0) + 1
-      } else {
-        designerCounts["[Blank]"] = (designerCounts["[Blank]"] || 0) + 1
-      }
-    })
-
-    // Product type counts: apply status + designer + store filters (NOT productType)
-    meraOrders.forEach((o) => {
-      if (filters.status?.length && !filters.status.includes(o.status)) return
-      if (!matchesDesigner(o)) return
-      if (filters.store?.length && !filters.store.includes(o.store!)) return
-      if (o.productType) productTypeCounts[o.productType] = (productTypeCounts[o.productType] || 0) + 1
-    })
-
-    // Store counts: apply status + designer + productType filters (NOT store)
-    meraOrders.forEach((o) => {
-      if (filters.status?.length && !filters.status.includes(o.status)) return
-      if (!matchesDesigner(o)) return
-      if (filters.productType?.length && !filters.productType.includes(o.productType!)) return
-      if (o.store) storeCounts[o.store] = (storeCounts[o.store] || 0) + 1
-    })
-
-    return { designerCounts, productTypeCounts, storeCounts }
-  }, [dataSource, meraOrders, filters])
 
   const filteredMeraOrders = useMemo(() => {
     if (dataSource !== "mera") return meraOrders
@@ -207,14 +221,8 @@ export default function ReviewPage() {
       }
       if (filters.productType?.length && !filters.productType.includes(order.productType!)) return false
       if (filters.store?.length && !filters.store.includes(order.store!)) return false
-      if (filters.searchQuery) {
-        const q = filters.searchQuery.toLowerCase()
-        const text = [order.itemId, order.orderNote, order.personalization, order.productName, order.designer, order.store]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-        if (!text.includes(q)) return false
-      }
+      // No search check here: Mera already searched every page (and matches fields this
+      // page does not show, like the customer), so re-checking would hide its results.
       return true
     })
   }, [meraOrders, filters, dataSource])
@@ -420,6 +428,7 @@ export default function ReviewPage() {
   const handleMeraRefresh = () => {
     clearResolvedDesignLinks()
     meraRefetch()
+    meraFacetsRefetch()
   }
 
   const handleSheetsRefresh = async () => {
@@ -429,6 +438,8 @@ export default function ReviewPage() {
 
   const handleStartSequentialReview = () => {
     if (activeOrders.length === 0) return
+    // The list on screen still belongs to the previous search until Mera answers
+    if (dataSource === "mera" && (meraSearchPending || meraLoading)) return
 
     setReviewMode({
       isActive: true,
@@ -880,10 +891,7 @@ export default function ReviewPage() {
             projects={meraProjects}
             projectsLoading={meraProjectsLoading}
             selectedProjectId={meraProjectId}
-            onProjectSelect={(projectId) => {
-              setMeraProjectId(projectId)
-              setMeraParams((p) => ({ ...p, page: 1 }))
-            }}
+            onProjectSelect={setMeraProjectId}
             ordersLoading={meraLoading}
             error={meraError}
           />
@@ -903,13 +911,12 @@ export default function ReviewPage() {
               pageSize: merPageSize,
               totalPages: meraTotalPages,
             }}
-            onPageSizeChange={(size) => setMeraParams((p) => ({ ...p, page_size: size, page: 1 }))}
-            onPageChange={(page) => setMeraParams((p) => ({ ...p, page }))}
+            onPageSizeChange={(size) => setMeraParams((p) => ({ ...p, page_size: size }))}
+            onPageChange={(page) => setMeraPageState({ page, key: meraFilterKey })}
             filterOptions={meraFilterOptions}
             statusCounts={meraDerivedStatusCounts}
-            designerCounts={meraDerivedFilteredCounts.designerCounts}
-            productTypeCounts={meraDerivedFilteredCounts.productTypeCounts}
-            storeCounts={meraDerivedFilteredCounts.storeCounts}
+            showFacetCounts={false}
+            searchPlaceholder="Search all orders by order ID, item ID, customer, store, or product type..."
             onRefresh={handleMeraRefresh}
           />
         )}

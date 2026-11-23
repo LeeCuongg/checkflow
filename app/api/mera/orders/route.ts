@@ -10,7 +10,17 @@ export async function GET(request: NextRequest) {
     const actor = { id: appUser.sub, email: appUser.email }
 
     const sp = request.nextUrl.searchParams
+    let columnFilters: MeraListOrdersParams["column_filters"]
+    const rawColumnFilters = sp.get("column_filters")
+    if (rawColumnFilters) {
+      try {
+        columnFilters = JSON.parse(rawColumnFilters)
+      } catch {
+        return NextResponse.json({ error: "invalid column_filters" }, { status: 400 })
+      }
+    }
     const params: MeraListOrdersParams = {
+      column_filters: columnFilters,
       page: sp.get("page") ? Number(sp.get("page")) : undefined,
       page_size: sp.get("page_size") ? Number(sp.get("page_size")) : undefined,
       channel: sp.get("channel") ?? undefined,
