@@ -35,8 +35,8 @@ interface OrderListHeaderProps {
   productTypeCounts?: Record<string, number>
   storeCounts?: Record<string, number>
   /**
-   * false = the designer / product type / store options are complete lists with no counts
-   * (Mera: they cover every page, and a count is only known for the loaded page).
+   * false = the designer / product type / store options are shown without counts
+   * (Mera: the counts come from the backend, and an old backend does not send them).
    */
   showFacetCounts?: boolean
   searchPlaceholder?: string
@@ -436,7 +436,10 @@ export function OrderListHeader({
                 <label className="block text-sm font-medium text-gray-700 mb-3">Designer</label>
                 <div className="space-y-2 max-h-[28rem] overflow-y-auto">
                   {filterOptions.designers
-                    .filter((designer) => !showFacetCounts || (designerCounts[designer] || 0) > 0)
+                    .filter(
+                      (designer) =>
+                        !showFacetCounts || (designerCounts[designer] || 0) > 0 || filters.designer?.includes(designer),
+                    )
                     .sort((a, b) => {
                       if (a === "[Blank]") return -1
                       if (b === "[Blank]") return 1
@@ -469,7 +472,7 @@ export function OrderListHeader({
                         </div>
                         {showFacetCounts && (
                           <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-200">
-                            {designerCounts[designer]}
+                            {designerCounts[designer] ?? 0}
                           </Badge>
                         )}
                       </label>
@@ -482,7 +485,10 @@ export function OrderListHeader({
                 <label className="block text-sm font-medium text-gray-700 mb-3">Product Type</label>
                 <div className="space-y-2 max-h-[28rem] overflow-y-auto">
                   {filterOptions.productTypes
-                    .filter((type) => !showFacetCounts || (productTypeCounts[type] || 0) > 0)
+                    .filter(
+                      (type) =>
+                        !showFacetCounts || (productTypeCounts[type] || 0) > 0 || filters.productType?.includes(type),
+                    )
                     .sort((a, b) => a.localeCompare(b))
                     .map((type) => (
                       <label
@@ -506,7 +512,7 @@ export function OrderListHeader({
                         </div>
                         {showFacetCounts && (
                           <Badge className="text-xs px-2 py-1 bg-purple-100 text-purple-700 border-purple-200">
-                            {productTypeCounts[type]}
+                            {productTypeCounts[type] ?? 0}
                           </Badge>
                         )}
                       </label>
@@ -519,7 +525,9 @@ export function OrderListHeader({
                 <label className="block text-sm font-medium text-gray-700 mb-3">Store</label>
                 <div className="space-y-2 max-h-[28rem] overflow-y-auto">
                   {filterOptions.stores
-                    .filter((store) => !showFacetCounts || (storeCounts[store] || 0) > 0)
+                    .filter(
+                      (store) => !showFacetCounts || (storeCounts[store] || 0) > 0 || filters.store?.includes(store),
+                    )
                     .sort((a, b) => a.localeCompare(b))
                     .map((store) => (
                       <label
@@ -543,7 +551,7 @@ export function OrderListHeader({
                         </div>
                         {showFacetCounts && (
                           <Badge className="text-xs px-2 py-1 bg-orange-100 text-orange-700 border-orange-200">
-                            {storeCounts[store]}
+                            {storeCounts[store] ?? 0}
                           </Badge>
                         )}
                       </label>

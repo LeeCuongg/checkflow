@@ -150,7 +150,7 @@ class MeraClient {
   ): Promise<MeraFacetResult> {
     return this.request<MeraFacetResult>("POST", "/api/v2/orders/facet-values", {
       actor,
-      body: { field, ...filters },
+      body: { field, ...filters, with_counts: true },
     })
   }
 

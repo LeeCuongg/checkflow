@@ -199,6 +199,21 @@ export default function ReviewPage() {
     }
   }, [dataSource, meraOrders, meraStatusCounts, meraFacets, filters.designer, filters.productType, filters.store])
 
+  // Items per designer / product type / store across every page, counted by Mera under the
+  // other active filters. null while unknown (not loaded yet, or a Mera backend that does not
+  // count) — then the options are listed without numbers rather than with page-only ones.
+  const meraFacetCounts = useMemo(() => {
+    const designer = meraFacets?.designer
+    const productType = meraFacets?.product_type
+    const store = meraFacets?.store
+    if (!designer?.counts || !productType?.counts || !store?.counts) return null
+    return {
+      designerCounts: { ...designer.counts, "[Blank]": designer.empty_count ?? 0 },
+      productTypeCounts: productType.counts,
+      storeCounts: store.counts,
+    }
+  }, [meraFacets])
+
   const meraDerivedStatusCounts = useMemo(() => {
     if (dataSource !== "mera") return {}
     // Use server-provided status_counts if available, otherwise compute from orders
@@ -487,6 +502,7 @@ export default function ReviewPage() {
         }
       })
       meraRefetch()
+      meraFacetsRefetch()
     }
 
     // Retry loop: mỗi lần 409 lấy version mới từ response và thử lại (tối đa 3 lần)
@@ -915,7 +931,10 @@ export default function ReviewPage() {
             onPageChange={(page) => setMeraPageState({ page, key: meraFilterKey })}
             filterOptions={meraFilterOptions}
             statusCounts={meraDerivedStatusCounts}
-            showFacetCounts={false}
+            showFacetCounts={meraFacetCounts !== null}
+            designerCounts={meraFacetCounts?.designerCounts}
+            productTypeCounts={meraFacetCounts?.productTypeCounts}
+            storeCounts={meraFacetCounts?.storeCounts}
             searchPlaceholder="Search all orders by order ID, item ID, customer, store, or product type..."
             onRefresh={handleMeraRefresh}
           />

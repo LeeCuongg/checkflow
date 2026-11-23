@@ -147,6 +147,10 @@ export interface MeraFacetResult {
   has_empty: boolean
   /** Mera caps a list at 1000 values */
   truncated: boolean
+  /** Items per value, across every page. Missing when the Mera backend is too old to count. */
+  counts?: Record<string, number>
+  /** Items whose value is blank */
+  empty_count?: number
 }
 
 export type MeraFacets = Partial<Record<MeraFacetField, MeraFacetResult>>
